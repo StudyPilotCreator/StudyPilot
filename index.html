@@ -130,12 +130,76 @@ const STOP=new Set(["Der","Die","Das","Ein","Eine","Einer","Eines","Einem","Eine
 function terms(text){const a=String(text||"").match(/\b[A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9-]{2,}(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9-]{2,}){0,2}\b/g)||[],counts={};for(let t of a){t=t.trim().replace(/\s+/g," ");if(t.length>2&&!STOP.has(t))counts[t]=(counts[t]||0)+1;}return Object.keys(counts).sort((a,b)=>counts[b]-counts[a]||b.length-a.length).slice(0,35);}
 function unique(a){return [...new Set(a.filter(Boolean))];}
 function chooseTopics(text,title,input){const p=unique(String(input||"").split(/[\n,;]+/).map(x=>x.trim()).filter(x=>x.length>1)).slice(0,12);if(p.length)return p;const lines=String(text||"").split(/\n+/).map(x=>x.trim()).filter(x=>x.length>2&&x.length<70),stop=/^(inhalt|inhaltsverzeichnis|lernziele|aufgaben|quellen|kapitel|zusammenfassung|arbeitsblatt|name|datum|seite\s+\d+)/i;const h=unique(lines.filter(x=>!stop.test(x)&&x.split(/\s+/).length<=7&&!/[.!?]$/.test(x)&&/[A-ZÄÖÜ]/.test(x))).slice(0,8);return h.length>=2?h:[String(title||"Gesamtüberblick")];}
-function bestFacts(text,topic){const sentences=splitSentences(text),key=String(topic||"").toLocaleLowerCase("de");let a=sentences.filter(x=>key.length>2&&x.toLocaleLowerCase("de").includes(key));if(a.length<2)a=sentences;const rank=a.map((s,i)=>({s,i,score:(/\b(19\d{2}|20\d{2})\b/.test(s)?3:0)+(/\b(weil|deshalb|dadurch|folglich|daher|führte|verursachte|bedeutet|ist|war)\b/i.test(s)?2:0)+(s.length>60&&s.length<260?2:0)})).sort((x,y)=>y.score-x.score||x.i-y.i);return rank.length?rank.slice(0,6).map(x=>x.s):String(text||"").trim()?[String(text).trim().slice(0,280)]:[];}
+function topicScore(sentence,topic){
+ const s=String(sentence||"").toLocaleLowerCase("de"),t=String(topic||"").toLocaleLowerCase("de");
+ const ignored=new Set(["und","oder","der","die","das","den","dem","des","ein","eine","einer","eines","einem","einen","mit","von","für","zum","zur","über","unter","the","and","aus","bei","thema","krieg","weltkrieg"]);
+ const words=t.split(/[^a-zäöüß0-9]+/).filter(w=>w.length>=3&&!ignored.has(w));
+ let score=words.reduce((n,w)=>n+(s.includes(w)?1:0),0);
+ const aliases=[
+  [/beginn|ausbruch|start/,["begann","beginnt","ausbruch","überfall","invasion","1939","ausgelöst"]],
+  [/kriegseintritt|usa|vereinigte staaten|pearl harbor/,["usa","vereinigte staaten","pearl harbor","1941","traten","trat","angriff"]],
+  [/ende|kapitulation|kriegsende|niederlage/,["endete","kapitulation","1945","beendete","sieg","niederlage"]],
+  [/ursach|grund|auslöser/,["ursache","ursachen","grund","auslöser","aufgrund","deshalb","führte zu"]],
+  [/folgen|auswirkung|konsequenz/,["folge","folgen","auswirkung","wiederaufbau","verlust","veränderung"]],
+  [/fried|vertrag|abkommen/,["frieden","vertrag","abkommen","unterzeichnet","gründeten"]]
+ ];
+ for(const [pattern,terms] of aliases){if(pattern.test(t))score+=terms.reduce((n,w)=>n+(s.includes(w)?2:0),0);}
+ return score;
+}
+function bestFacts(text,topic){
+ const sentences=splitSentences(text),matching=topic?sentences.filter(s=>topicScore(s,topic)>0):sentences;
+ const a=matching.length?matching:sentences;
+ const rank=a.map((s,i)=>({s,i,score:(/\b(19\d{2}|20\d{2})\b/.test(s)?3:0)+(/\b(weil|deshalb|dadurch|folglich|daher|führte|verursachte|bedeutet|ist|war)\b/i.test(s)?2:0)+(s.length>60&&s.length<260?2:0)})).sort((x,y)=>y.score-x.score||x.i-y.i);
+ return rank.length?rank.slice(0,6).map(x=>x.s):String(text||"").trim()?[String(text).trim().slice(0,280)]:[];
+}
+function levelSettings(grade,difficulty){
+ const g=Number(grade)||8,mode=difficulty&&difficulty!=="Automatisch"?difficulty:(g<=4?"Einfach":g<=9?"Mittel":"Anspruchsvoll");
+ const simple=mode==="Einfach"||g<=4;
+ return {grade:g,level:mode,summaryLimit:simple?3:5,cardLimit:simple?8:g<=7?12:g<=9?16:24,quizLimit:mode==="Anspruchsvoll"?12:simple?5:g<=7?7:9};
+}
 function escRegex(s){return s.replace(/[.*+?^$()|[\]\\]/g,"\\$&");}
 function optionsFor(answer,pool){const opts=unique(pool.filter(x=>x!==answer&&String(x).trim()));const backup=["Keine der anderen Angaben","Eine andere Jahreszahl","Ein anderes Ereignis","Keine passende Antwort"];while(opts.length<3){const x=backup.find(y=>y!==answer&&!opts.includes(y));if(!x)break;opts.push(x);}const all=[answer,...opts.slice(0,3)];for(let i=all.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[all[i],all[j]]=[all[j],all[i]];}return all;}
-function makeCards(text,title,set,tId){const facts=bestFacts(text,title),out=[];facts.forEach((s,i)=>{const y=s.match(/\b(1[89]\d{2}|20\d{2})\b/),def=s.match(/^(.{2,70}?)\s+(ist|war|sind|waren|bezeichnet|bedeutet|nennt man)\s+(.{10,})$/i);let q="Was ist eine wichtige Aussage zu „"+title+"“?";if(i)q="Nenne einen wichtigen Fakt zu „"+title+"“ ("+(i+1)+").";let a=s;if(y){q="Ergänze das Jahr: "+s.replace(y[0],"_____");a=y[0];}else if(def){q="Was "+def[2].toLowerCase()+" "+def[1].trim()+"?";a=def[3].replace(/[.!?]+$/,"");}out.push({id:set+"-"+tId+"-c"+i,question:q,answer:a,source:s});});return out.slice(0,24);}
-function makeQuiz(text,title,set,tId){const facts=bestFacts(text,title),termsList=terms(text),years=unique((String(text||"").match(/\b(?:18|19|20)\d{2}\b/g)||[])),out=[];for(const s of facts){if(out.length>=12)break;const y=s.match(/\b(?:18|19|20)\d{2}\b/);if(y){let pool=years.filter(x=>x!==y[0]);if(pool.length<3){const n=Number(y[0]);pool=unique(pool.concat([String(n-1),String(n+1),String(n+5)]).filter(x=>x!==y[0]));}const opts=optionsFor(y[0],pool);out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Welches Jahr passt in die Lücke?\n"+s.replace(y[0],"_____"),options:opts,correctIndex:opts.indexOf(y[0]),explanation:s});continue;}const term=termsList.filter(x=>s.toLocaleLowerCase("de").includes(x.toLocaleLowerCase("de"))).sort((a,b)=>b.length-a.length)[0];if(term&&s.length>35){const opts=optionsFor(term,termsList.filter(x=>x.length<=28));out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Welcher Begriff passt in die Lücke?\n"+s.replace(new RegExp(escRegex(term),"i"),"_____"),options:opts,correctIndex:opts.indexOf(term),explanation:s});}else out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Richtig oder falsch?\n"+s,options:["Richtig","Falsch"],correctIndex:0,explanation:s});}return out.slice(0,12);}
-function makeSet(input){const id=uid(),names=chooseTopics(input.text,input.title,input.topicInput),sentences=splitSentences(input.text);const topics=names.map((title,i)=>{const matching=sentences.filter(s=>s.toLocaleLowerCase("de").includes(title.toLocaleLowerCase("de")));let content=matching.length>=2?matching.join(" "):"";if(!content){const start=Math.floor(i*Math.max(1,sentences.length)/Math.max(1,names.length)),end=Math.max(start+1,Math.floor((i+1)*Math.max(1,sentences.length)/Math.max(1,names.length)));content=sentences.slice(start,end).join(" ")||input.text;}if(content.length<40)content=input.text;return {id:uid(),title,summary:bestFacts(content,title).slice(0,5),cards:makeCards(content,title,id,"t"+i),questions:makeQuiz(content,title,id,"t"+i),sourceText:content};});return {id,title:input.title,subject:input.subject,exam:input.exam,topicNames:names,content:String(input.text||"").slice(0,120000),documents:input.documents||[],topics,createdAt:new Date().toISOString()};}
+function makeCards(text,title,set,tId,settings){
+ const facts=bestFacts(text,title),out=[];
+ facts.forEach((s,i)=>{
+  const year=s.match(/\b(1[89]\d{2}|20\d{2})\b/),def=s.match(/^(.{2,70}?)\s+(ist|war|sind|waren|bezeichnet|bedeutet|nennt man)\s+(.{10,})$/i);
+  let q=settings.grade<=5?"Was ist wichtig zu „"+title+"“?":"Erkläre einen wichtigen Fakt zu „"+title+"“.",a=s;
+  if(i>0)q=settings.grade<=5?"Was ist noch wichtig zu „"+title+"“?":"Nenne einen weiteren wichtigen Fakt zu „"+title+"“ ("+(i+1)+").";
+  if(year){q=settings.grade<=5?"Welches Jahr gehört in die Lücke?\n"+s.replace(year[0],"_____"):"Ergänze die Jahreszahl in dieser Aussage:\n"+s.replace(year[0],"_____");a=year[0];}
+  else if(def){q="Was "+def[2].toLowerCase()+" "+def[1].trim()+"?";a=def[3].replace(/[.!?]+$/,"");}
+  out.push({id:set+"-"+tId+"-c"+i,question:q,answer:a,source:s});
+ });
+ if(!out.length&&String(text||"").trim())out.push({id:set+"-"+tId+"-c0",question:"Was weißt du über "+title+"?",answer:String(text).trim().slice(0,500),source:String(text).trim().slice(0,500)});
+ return out.slice(0,settings.cardLimit);
+}
+function makeQuiz(text,title,set,tId,settings){
+ const facts=bestFacts(text,title),termsList=terms(text),years=unique((String(text||"").match(/\b(?:18|19|20)\d{2}\b/g)||[])),out=[];
+ for(const s of facts){
+  if(out.length>=settings.quizLimit)break;
+  const y=s.match(/\b(?:18|19|20)\d{2}\b/);
+  if(y){
+   let pool=years.filter(x=>x!==y[0]);if(pool.length<3){const n=Number(y[0]);pool=unique(pool.concat([String(n-1),String(n+1),String(n+5)]).filter(x=>x!==y[0]));}
+   const opts=optionsFor(y[0],pool),prompt=settings.grade<=5?"Welches Jahr gehört in die Lücke?\n":"Welche Jahreszahl gehört in diese Aussage?\n";
+   out.push({id:set+"-"+tId+"-q"+out.length,prompt:prompt+s.replace(y[0],"_____"),options:opts,correctIndex:opts.indexOf(y[0]),explanation:s});continue;
+  }
+  const term=termsList.filter(x=>s.toLocaleLowerCase("de").includes(x.toLocaleLowerCase("de"))).sort((a,b)=>b.length-a.length)[0];
+  if(term&&s.length>35){
+   const opts=optionsFor(term,termsList.filter(x=>x.length<=28)),prompt=settings.level==="Anspruchsvoll"?"Welcher Begriff passt fachlich in die Lücke?\n":"Welcher Begriff passt in die Lücke?\n";
+   out.push({id:set+"-"+tId+"-q"+out.length,prompt:prompt+s.replace(new RegExp(escRegex(term),"i"),"_____"),options:opts,correctIndex:opts.indexOf(term),explanation:s});
+  }else out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Richtig oder falsch?\n"+s,options:["Richtig","Falsch"],correctIndex:0,explanation:s});
+ }
+ return out.slice(0,settings.quizLimit);
+}
+function makeSet(input){
+ const id=uid(),names=chooseTopics(input.text,input.title,input.topicInput),sentences=splitSentences(input.text),settings=levelSettings(input.grade,input.difficulty);
+ const topics=names.map((title,i)=>{
+  const matching=sentences.filter(s=>topicScore(s,title)>0);
+  let content=matching.length?matching.join(" "):String(input.text||"");
+  if(!content)content=input.text;
+  return {id:uid(),title,summary:bestFacts(content,title).slice(0,settings.summaryLimit),cards:makeCards(content,title,id,"t"+i,settings),questions:makeQuiz(content,title,id,"t"+i,settings),sourceText:content};
+ });
+ return {id,title:input.title,subject:input.subject,exam:input.exam,grade:settings.grade,difficulty:settings.level,topicNames:names,content:String(input.text||"").slice(0,120000),documents:input.documents||[],topics,createdAt:new Date().toISOString()};
+}
 function loadScript(src,test){return new Promise((resolve,reject)=>{if(test()){resolve();return;}const x=document.createElement("script");x.src=src;x.async=true;x.onload=()=>test()?resolve():reject(new Error("Bibliothek nicht verfügbar."));x.onerror=()=>reject(new Error("Bibliothek konnte nicht geladen werden. Prüfe deine Internetverbindung."));document.head.appendChild(x);});}
 async function ensurePdf(){await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js",()=>!!window.pdfjsLib);pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";}
 async function createWorker(){await loadScript("https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js",()=>!!window.Tesseract);return await Tesseract.createWorker("deu+eng",1,{workerPath:"https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js",corePath:"https://cdn.jsdelivr.net/npm/tesseract.js-core@5.0.0",langPath:"https://tessdata.projectnaptha.com/4.0.0"});}
@@ -196,11 +260,11 @@ document.addEventListener("submit",async e=>{
   const title=$("set-title").value.trim(),subject=$("set-subject").value,exam=$("set-exam").value,topicInput=$("set-topics").value;let txt=$("set-notes").value.trim();const files=pendingFiles.slice();
   if(!title){notify("Gib dem Lernset einen Namen.");return;}if(!txt&&!files.length){notify("Füge eine Datei oder Text ein.");return;}
   processing=true;const btn=$("create-button");btn.disabled=true;const status=m=>{const n=$("create-status");if(n)n.textContent=m;};status("Lernmaterial wird vorbereitet …");
-  try{let docs=[],errors=[];if(files.length){const r=await readFiles(files,status);txt=(txt+"\n\n"+r.text).trim();docs=r.names;errors=r.errors;}if(txt.length<25)throw new Error("Zu wenig lesbarer Text erkannt. Versuche ein schärferes Foto oder füge Text ein.");status("Erstelle Übersicht, Karteikarten und Quizfragen …");const s=makeSet({title,subject,exam,topicInput,text:txt,documents:docs});data.sets.unshift(s);data.lastOpened=s.id;const ok=save();closeModal();setId=s.id;view="set";renderApp();notify("Lernset erstellt: "+s.topics.length+" Themen, "+s.topics.reduce((n,t)=>n+t.cards.length,0)+" Karten und "+s.topics.reduce((n,t)=>n+t.questions.length,0)+" Fragen."+(ok?"":" Speicher prüfen."));if(errors.length)alert("Einige Dateien konnten nicht gelesen werden:\n"+errors.join("\n")+"\n\nDu kannst den Text über „Material bearbeiten“ ergänzen.");}
+  try{let docs=[],errors=[];if(files.length){const r=await readFiles(files,status);txt=(txt+"\n\n"+r.text).trim();docs=r.names;errors=r.errors;}if(txt.length<25)throw new Error("Zu wenig lesbarer Text erkannt. Versuche ein schärferes Foto oder füge Text ein.");status("Erstelle Übersicht, Karteikarten und Quizfragen …");const s=makeSet({title,subject,exam,topicInput,text:txt,documents:docs,grade:data.profile.grade,difficulty:data.profile.difficulty});data.sets.unshift(s);data.lastOpened=s.id;const ok=save();closeModal();setId=s.id;view="set";renderApp();notify("Lernset erstellt: "+s.topics.length+" Themen, "+s.topics.reduce((n,t)=>n+t.cards.length,0)+" Karten und "+s.topics.reduce((n,t)=>n+t.questions.length,0)+" Fragen."+(ok?"":" Speicher prüfen."));if(errors.length)alert("Einige Dateien konnten nicht gelesen werden:\n"+errors.join("\n")+"\n\nDu kannst den Text über „Material bearbeiten“ ergänzen.");}
   catch(err){status(err.message||"Ein Fehler ist aufgetreten.");btn.disabled=false;notify("Lernset konnte nicht erstellt werden.");}
   finally{processing=false;}return;
  }
- if(e.target.id==="edit-form"){e.preventDefault();const old=getSet($("edit-id").value),txt=$("edit-content").value.trim(),title=$("edit-title").value.trim();if(!old||txt.length<25||!title){notify("Bitte gib einen Titel und mindestens 25 Zeichen Text ein.");return;}const s=makeSet({title,subject:old.subject,exam:old.exam,topicInput:(old.topicNames||[]).join("\n"),text:txt,documents:old.documents||[]});s.id=old.id;s.createdAt=old.createdAt;data.sets=data.sets.map(x=>x.id===old.id?s:x);save();closeModal();setId=s.id;view="set";renderApp();notify("Lernmaterial neu erstellt.");return;}
+ if(e.target.id==="edit-form"){e.preventDefault();const old=getSet($("edit-id").value),txt=$("edit-content").value.trim(),title=$("edit-title").value.trim();if(!old||txt.length<25||!title){notify("Bitte gib einen Titel und mindestens 25 Zeichen Text ein.");return;}const s=makeSet({title,subject:old.subject,exam:old.exam,topicInput:(old.topicNames||[]).join("\n"),text:txt,documents:old.documents||[],grade:old.grade||data.profile.grade,difficulty:old.difficulty||data.profile.difficulty});s.id=old.id;s.createdAt=old.createdAt;data.sets=data.sets.map(x=>x.id===old.id?s:x);save();closeModal();setId=s.id;view="set";renderApp();notify("Lernmaterial neu erstellt.");return;}
 });
 if("serviceWorker" in navigator&&location.protocol!=="file:")window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
 renderApp();
