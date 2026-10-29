@@ -154,7 +154,7 @@ function bestFacts(text,topic){
 }
 function levelSettings(grade,difficulty){
  const g=Number(grade)||8,mode=difficulty&&difficulty!=="Automatisch"?difficulty:(g<=4?"Einfach":g<=9?"Mittel":"Anspruchsvoll");
- const simple=mode==="Einfach"||g<=4;
+ const simple=mode==="Einfach"||(difficulty==="Automatisch"&&g<=4);
  return {grade:g,level:mode,summaryLimit:simple?3:5,cardLimit:simple?8:g<=7?12:g<=9?16:24,quizLimit:mode==="Anspruchsvoll"?12:simple?5:g<=7?7:9};
 }
 function escRegex(s){return s.replace(/[.*+?^$()|[\]\\]/g,"\\$&");}
@@ -229,7 +229,7 @@ function rateCard(rating){const c=session.items[session.index];if(!c)return;cons
 function endSession(){session=null;view=returnView==="session"?"home":returnView;renderApp();}
 function handleClick(e){
  const b=e.target.closest("[data-action]");if(!b)return;const a=b.dataset.action;
- if(a==="toggle-subject"){const arr=data.profile.subjects,n=b.dataset.subject,i=arr.indexOf(n);if(i>=0){if(arr.length===1){notify("Wähle mindestens ein Fach.");return;}arr.splice(i,1);}else arr.push(n);if(view==="profile")renderApp();else setup();return;}
+ if(a==="toggle-subject"){if(view==="profile"){data.profile.school=$("profile-school").value;data.profile.grade=Number($("profile-grade").value);data.profile.difficulty=$("profile-difficulty").value;}else if($("setup-school")){data.profile.school=$("setup-school").value;data.profile.grade=Number($("setup-grade").value);data.profile.difficulty=$("setup-difficulty").value;}const arr=data.profile.subjects,n=b.dataset.subject,i=arr.indexOf(n);if(i>=0){if(arr.length===1){notify("Wähle mindestens ein Fach.");return;}arr.splice(i,1);}else arr.push(n);if(view==="profile")renderApp();else setup();return;}
  if(a==="new-set"){openNewSet(b.dataset.subject||"");return;}
  if(a==="nav"){view=b.dataset.view;subjectFilter="";searchQuery="";if(["home","library","review","profile"].includes(view))session=null;renderApp();return;}
  if(a==="open-subject"){subjectFilter=b.dataset.subject;searchQuery="";view="library";renderApp();return;}
