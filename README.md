@@ -31,3 +31,5 @@ This version does not call a large language model. Summary, flashcard and questi
 - Backup imports normalise nested topic/card/quiz data before rendering.
 
 - The profile difficulty label updates immediately when the class is changed; rebuilt study sets reset quiz statistics and review schedules tied to the previous cards.
+
+- Imported class grades and difficulty values are range-checked before they affect generated learning material.
