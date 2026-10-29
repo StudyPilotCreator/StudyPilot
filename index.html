@@ -232,7 +232,10 @@ function openNewSet(subject){
  modal('<h2>Neues Lernset erstellen</h2><p>Wähle Fach und Klassenarbeit, lade Themenliste und Inhalte hoch oder füge Text direkt ein. StudyPilot erstellt daraus Übersicht, Karteikarten und Quizfragen.</p><form id="new-set-form"><div class="form-grid"><div class="field"><label for="set-subject">Fach</label><select id="set-subject">'+subjects.map(s=>'<option '+(s===chosen?"selected":"")+'>'+esc(s)+'</option>').join("")+'</select></div><div class="field"><label for="set-exam">Wofür lernst du?</label><select id="set-exam">'+EXAMS.map(s=>'<option '+(s==="Klassenarbeit"?"selected":"")+'>'+esc(s)+'</option>').join("")+'</select></div><div class="field full"><label for="set-title">Name des Lernsets</label><input id="set-title" maxlength="100" required placeholder="z. B. Zweiter Weltkrieg – Klassenarbeit"></div><div class="field full"><label for="set-topics">Themen (optional, ein Thema pro Zeile)</label><textarea id="set-topics" placeholder="Zweiter Weltkrieg&#10;USA und Kriegseintritt&#10;Kriegsende in Europa"></textarea><small>Wenn du Themen vorgibst, ordnet die App Informationen diesen Stichwörtern zu.</small></div><div class="field full"><label>Fotos oder PDFs</label><label for="set-files" class="dropzone"><span style="font-size:27px">📄</span><strong>Material auswählen</strong><span>PDF, JPG, PNG, WEBP, HEIC oder TXT · max. 8 Dateien<br>20 MB je Datei · PDFs: erste 15 Seiten · OCR für Scans</span><input id="set-files" type="file" accept=".pdf,.txt,image/jpeg,image/png,image/webp,image/heic" multiple hidden></label><div id="file-list" class="file-list"></div></div><div class="field full"><label for="set-notes">Oder Text direkt einfügen</label><textarea id="set-notes" style="min-height:125px" placeholder="Kopiere hier deine Mitschrift, Themenliste oder bereits erkannten Text hinein …"></textarea></div></div><div id="create-status" class="small-text" style="margin-top:12px" aria-live="polite"></div><div id="create-loading" class="create-loading" aria-hidden="true"><div class="create-loading-head"><span id="create-progress-label">Vorbereitung</span><strong id="create-progress-percent">0%</strong></div><div class="create-progress-track" role="progressbar" aria-label="Lernmaterial wird erstellt" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="create-progress-fill"></span></div><div class="create-loading-note">Fotos und PDFs werden auf diesem Gerät verarbeitet.</div></div><div class="form-note" style="margin-top:12px">🔒 Deine Dateien werden im Browser ausgelesen und nicht an einen StudyPilot-Server hochgeladen. Die erste Foto-OCR benötigt Internet. Fragen entstehen derzeit durch lokale Textregeln statt ein großes KI-Modell — kontrolliere deshalb wichtige Fakten und die Themenzuordnung.</div><div class="form-actions"><button class="btn" type="button" data-action="modal-close">Abbrechen</button><button class="btn mint" id="create-button" type="submit">✨ Lernmaterial erstellen</button></div></form>');pendingFiles=[];
 }
 function cleanSourceText(text){return String(text||"").normalize("NFC").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g," ").replace(/\uFFFD/g," ").replace(/\u00AD/g,"").replace(/([A-Za-zÄÖÜäöüß])-\s*\n\s*(?=[a-zäöüß])/g,"$1").replace(/\r/g,"\n").replace(/[ \t]+\n/g,"\n").replace(/\n{3,}/g,"\n\n").replace(/[ \t]{2,}/g," ").trim();}
-function splitSentences(text){return cleanSourceText(text).replace(/[•▪◦]/g," ").split(/\n+/).flatMap(x=>x.match(/[^.!?]+[.!?]?/g)||[]).map(x=>x.replace(/\s+/g," ").trim()).filter(x=>x.length>=24&&x.length<=500);}
+function splitSentences(text){
+ const protectedText=cleanSourceText(text).replace(/[•▪◦]/g," ").replace(/\b(\d{1,2})\.(?=\s)/g,"$1\uE000");
+ return protectedText.split(/\n+/).flatMap(line=>line.replace(/([.!?])\s+(?=[A-ZÄÖÜ0-9„"'“(])/g,"$1\n").split(/\n/)).map(x=>x.replace(/\uE000/g,".").replace(/\s+/g," ").trim()).filter(x=>x.length>=24&&x.length<=500);
+}
 const STOP=new Set(["Der","Die","Das","Ein","Eine","Einer","Eines","Einem","Einen","Dann","Dort","Hier","Diese","Dieser","Dieses","Nach","Vor","Seit","Bei","Durch","Damit","Wenn","Weil","Als","Auch","Aber","Oder","Und","Von","Für","Mit","Im","In","Am","An","Auf","Aus","Zum","Zur","Über","Unter","Er","Sie","Es","Wir","Man","Dabei","Wurde","Werden","War","Ist"]);
 function terms(text){const a=String(text||"").match(/\b[A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9-]{2,}(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9-]{2,}){0,2}\b/g)||[],counts={};for(let t of a){t=t.trim().replace(/\s+/g," ");if(t.length>2&&!STOP.has(t))counts[t]=(counts[t]||0)+1;}return Object.keys(counts).sort((a,b)=>counts[b]-counts[a]||b.length-a.length).slice(0,35);}
 function unique(a){return [...new Set(a.filter(Boolean))];}
@@ -241,13 +244,14 @@ function topicScore(sentence,topic){
  const s=String(sentence||"").toLocaleLowerCase("de"),t=String(topic||"").toLocaleLowerCase("de");
  const ignored=new Set(["und","oder","der","die","das","den","dem","des","ein","eine","einer","eines","einem","einen","mit","von","für","zum","zur","über","unter","the","and","aus","bei","thema","krieg","weltkrieg"]);
  const words=t.split(/[^a-zäöüß0-9]+/).filter(w=>w.length>=3&&!ignored.has(w));
- const has=raw=>new RegExp("(^|[^a-zäöüß0-9])"+escRegex(String(raw).toLocaleLowerCase("de"))+"([^a-zäöüß0-9]|$)","i").test(s);
+ const has=raw=>new RegExp("(^|[^a-zäöüß0-9])"+escRegex(String(raw).toLocaleLowerCase("de"))+"(?:e|en|er|es|em|ern|n|s)?([^a-zäöüß0-9]|$)","i").test(s);
  const wordMatches=words.reduce((n,w)=>n+(has(w)?1:0),0);
  let score=wordMatches;
  if(words.length>=2&&wordMatches===1)score=0;
  if(/weltkrieg/.test(t)&&has("weltkrieg"))score+=5;
  if(/zweiter weltkrieg/.test(t)&&/zweite[rn]? weltkrieg/.test(s))score+=2;
  const aliases=[
+  [/weltkrieg|krieg/,["deutschland","polen","alliierten","kapitulation","kriegsende","überfall","invasion","besetzung","besetzten","besatzung","front","endete","niederlage","sieg"]],
   [/beginn|ausbruch|start/,["begann","beginnt","ausbruch","überfall","invasion","ausgelöst"]],
   [/kriegseintritt|usa|vereinigte staaten|pearl harbor/,["usa","vereinigte staaten","pearl harbor","traten","trat","angriff","kriegseintritt"]],
   [/ende|kapitulation|kriegsende|niederlage/,["endete","kapitulation","beendete","sieg","niederlage"]],
@@ -316,8 +320,8 @@ function makeFalseStatement(sentence,termList,allYears){
 }
 function makeQuiz(text,title,set,tId,settings){
  const source=cleanSourceText(text),years=unique((source.match(/\b(?:18|19|20)\d{2}\b/g)||[])),limit=settings.quizLimit,out=[],usedSentences=new Set();
- const rawFacts=unique(bestFacts(source,title).concat(splitSentences(source).filter(s=>topicScore(s,title)>0))).map(s=>s.trim()).filter(s=>s.length>=35&&s.length<=340&&(s.match(/\S+/g)||[]).length>=6);
- const facts=rawFacts.length?rawFacts:unique(splitSentences(source)).filter(s=>s.length>=35&&s.length<=340&&(s.match(/\S+/g)||[]).length>=6);
+ const rawFacts=unique(bestFacts(source,title).concat(splitSentences(source).filter(s=>topicScore(s,title)>0))).map(s=>s.trim()).filter(s=>s.length>=24&&s.length<=340&&(s.match(/\S+/g)||[]).length>=5);
+ const facts=rawFacts.length?rawFacts:unique(splitSentences(source)).filter(s=>s.length>=24&&s.length<=340&&(s.match(/\S+/g)||[]).length>=5);
  for(const s of facts){
   if(out.length>=limit)break;
   const year=s.match(/\b(?:18|19|20)\d{2}\b/);if(!year)continue;
