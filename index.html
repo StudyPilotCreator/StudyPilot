@@ -264,7 +264,7 @@ function topicScore(sentence,topic){
 }
 function bestFacts(text,topic){
  const sentences=splitSentences(text),matching=topic?sentences.filter(s=>topicScore(s,topic)>0):sentences;
- const a=matching.length?matching:sentences;
+ const coverage=matching.length/Math.max(1,sentences.length),a=matching.length>=2&&coverage>=0.25?matching:sentences;
  const rank=a.map((s,i)=>({s,i,score:(/\b(19\d{2}|20\d{2})\b/.test(s)?3:0)+(/\b(weil|deshalb|dadurch|folglich|daher|führte|verursachte|bedeutet|ist|war)\b/i.test(s)?2:0)+(s.length>60&&s.length<260?2:0)})).sort((x,y)=>y.score-x.score||x.i-y.i);
  return rank.length?rank.slice(0,6).map(x=>x.s):String(text||"").trim()?[String(text).trim().slice(0,280)]:[];
 }
@@ -314,14 +314,14 @@ function makeFalseStatement(sentence,termList,allYears){
   const wrong=candidates.find(x=>x!==raw);
   if(wrong)return sentence.replace(raw,wrong);
  }
- const verb=sentence.match(/\b(ist|sind|war|waren|wurde|wurden|hat|haben|hatte|hatten|wird|werden|beginnt|begann|endet|endete|führt|führte|liegt|liegen|bezeichnet|bedeutet|gehört)\b/i);
+ const verb=sentence.match(/\b(ist|sind|war|waren|wurde|wurden|hat|haben|hatte|hatten|wird|werden|beginnt|begann|endet|endete|führt|führte|liegt|liegen|bezeichnet|bedeutet|gehört|lebt|lebte|lebten|leben|arbeitet|arbeitete|arbeiteten|arbeiten|muss|musste|mussten|müssen|kann|konnte|konnten|können|sollte|sollten|durfte|durften|litt|litten|bekam|bekamen|gab|gaben|nahm|nahmen|stand|standen|ging|gingen|kam|kamen|hielt|hielten|trat|traten|besiegte|besiegten|regierte|regierten|herrschte|herrschten|baute|bauten|gründete|gründeten|nutzte|nutzten|entwickelte|entwickelten|entstand|entstanden|blieb|blieben|verlor|verloren|gewann|gewannen|setzte|setzten|bildete|bildeten|veränderte|veränderten|stieg|stiegen|sank|sanken|kämpfte|kämpften|zog|zogen|erhielt|erhielten|bestand|bestanden|umfasste|umfassten)\b/i);
  if(verb&&!/\b(nicht|kein|keine|keiner|keines|keinem|keinen)\b/i.test(sentence))return sentence.replace(verb[0],verb[0]+" nicht");
  return "";
 }
 function makeQuiz(text,title,set,tId,settings){
  const source=cleanSourceText(text),years=unique((source.match(/\b(?:18|19|20)\d{2}\b/g)||[])),limit=settings.quizLimit,out=[],usedSentences=new Set();
- const rawFacts=unique(bestFacts(source,title).concat(splitSentences(source).filter(s=>topicScore(s,title)>0))).map(s=>s.trim()).filter(s=>s.length>=24&&s.length<=340&&(s.match(/\S+/g)||[]).length>=5);
- const facts=rawFacts.length?rawFacts:unique(splitSentences(source)).filter(s=>s.length>=24&&s.length<=340&&(s.match(/\S+/g)||[]).length>=5);
+ const sentencePool=unique(splitSentences(source)).filter(s=>s.length>=24&&s.length<=340&&(s.match(/\S+/g)||[]).length>=5),matching=sentencePool.filter(s=>topicScore(s,title)>0),focused=matching.length>=2&&matching.length/Math.max(1,sentencePool.length)>=0.25;
+ const facts=(focused?matching:sentencePool).slice(0,Math.max(limit*2,20));
  for(const s of facts){
   if(out.length>=limit)break;
   const year=s.match(/\b(?:18|19|20)\d{2}\b/);if(!year)continue;
@@ -345,7 +345,8 @@ function makeQuiz(text,title,set,tId,settings){
  for(const s of facts){
   if(out.length>=limit)break;
   if(usedSentences.has(s))continue;
-  const falseText=makeFalseStatement(s,[],years),useFalse=Boolean(falseText)&&candidateIndex%2===1,statement=useFalse?falseText:s;
+  const falseText=makeFalseStatement(s,[],years);if(!falseText)continue;
+  const useFalse=candidateIndex%2===0,statement=useFalse?falseText:s;
   out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Prüfe die Aussage anhand deiner Unterlagen.\n"+statement,options:["Richtig","Falsch"],correctIndex:useFalse?1:0,explanation:useFalse?"Im Material steht stattdessen: "+s:"Diese Aussage wurde direkt aus dem Material übernommen: "+s,topicTitle:title});
   candidateIndex++;usedSentences.add(s);
  }
@@ -354,10 +355,10 @@ function makeQuiz(text,title,set,tId,settings){
 function makeSet(input){
  const source=cleanSourceText(input.text),id=uid(),names=chooseTopics(source,input.title,input.topicInput),sentences=splitSentences(source),settings=levelSettings(input.grade,input.difficulty);
  const topics=names.map((title,i)=>{
-  const matching=sentences.filter(s=>topicScore(s,title)>0);
-  let content=matching.length?matching.join(" "):source;
+  const matching=sentences.filter(s=>topicScore(s,title)>0),useMatched=matching.length>=2&&matching.length/Math.max(1,sentences.length)>=0.25;
+  let content=useMatched?matching.join(" "):source;
   if(!content)content=source;
-  return {id:uid(),title,summary:bestFacts(content,title).slice(0,settings.summaryLimit),cards:makeCards(content,title,id,"t"+i,settings),questions:makeQuiz(content,title,id,"t"+i,settings),sourceText:content,matchMode:matching.length?"matched":"general"};
+  return {id:uid(),title,summary:bestFacts(content,title).slice(0,settings.summaryLimit),cards:makeCards(content,title,id,"t"+i,settings),questions:makeQuiz(content,title,id,"t"+i,settings),sourceText:content,matchMode:useMatched?"matched":"general"};
  });
  return {id,title:input.title,subject:input.subject,exam:input.exam,grade:settings.grade,difficulty:settings.level,topicNames:names,content:source.slice(0,120000),documents:input.documents||[],topics,createdAt:new Date().toISOString()};
 }
