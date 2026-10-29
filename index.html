@@ -155,40 +155,53 @@ function autoPlan(dateString){
  const now=new Date();
  const startAt=dateString===iso(today)?Math.max(7*60,now.getHours()*60+now.getMinutes()+5):7*60;
  const endAt=22*60;
- const fixed=allItems(dateString).map(it=>({start:timeM(it.start),end:timeM(it.end)})).filter(it=>it.end>it.start&&it.end>startAt&&it.start<endAt).sort((a,b)=>a.start-b.start);
+ const fixed=allItems(dateString)
+  .map(it=>({start:timeM(it.start),end:timeM(it.end)}))
+  .filter(it=>Number.isFinite(it.start)&&Number.isFinite(it.end)&&it.end>it.start&&it.end>startAt&&it.start<endAt)
+  .sort((a,b)=>a.start-b.start);
  const slots=[];
  let cursor=Math.min(startAt,endAt);
  for(const block of fixed){
   if(block.end<=cursor)continue;
-  if(block.start>cursor)slots.push({start:cursor,end:Math.min(block.start,endAt)});
+  if(block.start>cursor)slots.push({start:cursor,end:Math.min(block.start,endAt),tasksInSlot:0});
   cursor=Math.max(cursor,block.end);
   if(cursor>=endAt)break;
  }
- if(cursor<endAt)slots.push({start:cursor,end:endAt});
+ if(cursor<endAt)slots.push({start:cursor,end:endAt,tasksInSlot:0});
+
  const rank={Hoch:0,Mittel:1,Niedrig:2};
- const open=tasksFor(dateString).filter(t=>!t.done).slice().sort((a,b)=>(rank[a.priority]??1)-(rank[b.priority]??1)||Number(a.duration||25)-Number(b.duration||25));
+ const pending=tasksFor(dateString)
+  .filter(t=>!t.done)
+  .slice()
+  .sort((a,b)=>(rank[a.priority]??1)-(rank[b.priority]??1)||Number(a.duration||25)-Number(b.duration||25));
  const scheduled=[];
- const unscheduled=[];
- for(const task of open){
-  const duration=Math.max(5,Number(task.duration||25));
-  const slot=slots.find(s=>s.end-s.start>=duration);
-  if(!slot){unscheduled.push(task);continue;}
-  const start=slot.start,end=start+duration;
-  scheduled.push({task,start,end});
-  slot.start=end+(scheduled.length%2===0?5:0);
+ // Fill free windows chronologically. Within each window choose the highest-priority
+ // task that fits, so a short task can use a short gap instead of leaving it unused.
+ for(const slot of slots){
+  while(slot.end-slot.start>=5&&pending.length){
+   const available=pending.findIndex(task=>Math.max(5,Number(task.duration||25))<=slot.end-slot.start);
+   if(available<0)break;
+   const task=pending.splice(available,1)[0];
+   const duration=Math.max(5,Number(task.duration||25));
+   const start=slot.start;
+   const end=start+duration;
+   const canTakeBreak=(slot.tasksInSlot+1)%2===0&&slot.end-end>=5;
+   scheduled.push({task,start,end,breakAfter:canTakeBreak});
+   slot.tasksInSlot++;
+   slot.start=end+(canTakeBreak?5:0);
+  }
  }
- return {scheduled,unscheduled,conflicts:getPlanConflicts(dateString),openCount:open.length};
+ return {scheduled,unscheduled:pending,conflicts:getPlanConflicts(dateString),openCount:tasksFor(dateString).filter(t=>!t.done).length};
 }
 function renderAutoPlan(dateString){
  const plan=autoPlan(dateString);
  const conflictHtml=plan.conflicts.length?'<div class="plan-alert">⚠️ '+plan.conflicts.map(esc).join("<br>")+' — prüfe, ob die Zeiten stimmen.</div>':"";
- const lines=plan.scheduled.map((item,i)=>'<div class="plan-line"><div class="plan-time">'+fmtTime(item.start)+'–'+fmtTime(item.end)+'</div><div style="flex:1;min-width:0"><div class="plan-task">'+esc(item.task.title)+' <span class="plan-badge">'+esc(item.task.priority||"Mittel")+'</span></div><div class="plan-detail">'+Number(item.task.duration||25)+' Minuten'+(i%2===1?' · danach 5 Minuten Pause':'')+'</div></div></div>').join("");
+ const lines=plan.scheduled.map(item=>'<div class="plan-line"><div class="plan-time">'+fmtTime(item.start)+'–'+fmtTime(item.end)+'</div><div style="flex:1;min-width:0"><div class="plan-task">'+esc(item.task.title)+' <span class="plan-badge">'+esc(item.task.priority||"Mittel")+'</span></div><div class="plan-detail">'+Number(item.task.duration||25)+' Minuten'+(item.breakAfter?' · danach 5 Minuten Pause':'')+'</div></div></div>').join("");
  let tail="";
- if(plan.openCount===0)tail='<div class="plan-success">✨ Alles erledigt! Du hast gerade keine offenen Aufgaben für heute.</div>';
- else if(plan.unscheduled.length)tail='<div class="plan-alert">'+plan.unscheduled.length+' Aufgabe(n) passen nicht mehr vollständig in freie Zeit bis 22:00 Uhr. Du kannst Termine prüfen oder Aufgaben auf einen anderen Tag verschieben.</div>';
- if(plan.scheduled.length===0&&plan.openCount>0&&!plan.unscheduled.length)tail='<div class="empty">Für heute sind keine offenen Aufgaben übrig.</div>';
- else if(plan.scheduled.length===0&&plan.openCount>0)tail='<div class="empty">Ich finde für die offenen Aufgaben gerade kein ausreichend langes freies Zeitfenster. Prüfe deine Termine oder plane die Aufgaben für morgen.</div>';
- return '<section class="panel glass auto-plan"><div class="auto-plan-head"><div><h2>Dein automatischer Plan</h2><div class="small-text" style="margin-top:4px">Freie Zeit zwischen festen Terminen</div></div><button class="btn small primary" data-action="auto-plan">↻ Neu berechnen</button></div><div class="plan-note">Prioritäten werden berücksichtigt. Nach jeweils zwei Aufgaben ist eine kurze Pause eingeplant. Der Vorschlag ändert deine festen Termine nicht.</div>'+conflictHtml+(lines?'<div>'+lines+'</div>':"")+tail+'</section>';
+ if(plan.openCount===0)tail='<div class="plan-success">✨ Alles erledigt! Du hast gerade keine offenen Aufgaben für diesen Tag.</div>';
+ else if(plan.unscheduled.length)tail='<div class="plan-alert">'+plan.unscheduled.length+' Aufgabe(n) passen nicht vollständig in freie Zeit bis 22:00 Uhr. Prüfe deine Termine oder plane Aufgaben auf einen anderen Tag.</div>';
+ if(plan.scheduled.length===0&&plan.openCount>0)tail+='<div class="empty">Es gibt kein ausreichend langes freies Zeitfenster für deine offenen Aufgaben. Prüfe deine Termine oder verschiebe Aufgaben auf einen anderen Tag.</div>';
+ return '<section class="panel glass auto-plan"><div class="auto-plan-head"><div><h2>Dein automatischer Plan</h2><div class="small-text" style="margin-top:4px">Freie Zeit zwischen festen Terminen</div></div><button class="btn small primary" data-action="auto-plan">↻ Neu berechnen</button></div><div class="plan-note">Der Vorschlag füllt freie Zeit chronologisch. Prioritäten werden berücksichtigt, feste Termine bleiben unverändert. Nach jeweils zwei Aufgaben im selben Zeitfenster wird eine kurze Pause vorgesehen, wenn genug Zeit bleibt.</div>'+conflictHtml+(lines?'<div>'+lines+'</div>':"")+tail+'</section>';
 }
 function renderToday(){
 const dayTasks=tasksFor(iso(today)),open=dayTasks.filter(t=>!t.done),done=dayTasks.filter(t=>t.done).length,total=dayTasks.length,minutes=open.reduce((s,t)=>s+Number(t.duration||25),0),totalXp=data.tasks.filter(t=>t.done).length*25;
