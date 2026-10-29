@@ -53,7 +53,29 @@ const parseDate=s=>{const p=String(s||iso(new Date())).split("-").map(Number);re
 const today=new Date();today.setHours(0,0,0,0);const todayKey=iso(today);
 const subInfo=n=>SUBJECTS.find(s=>s.name===n)||{name:n,icon:"📘",color:"#36314f"};
 const baseData=()=>({profile:{setupDone:false,school:"Gymnasium",grade:8,difficulty:"Automatisch",subjects:["Deutsch","Mathematik","Englisch","Geschichte","Biologie"]},sets:[],reviews:{},quizStats:{},lastOpened:""});
-let data;try{data=JSON.parse(localStorage.getItem(KEY)||"null")||baseData();if(!data.profile)data.profile=baseData().profile;if(!Array.isArray(data.sets))data.sets=[];if(!data.reviews)data.reviews={};if(!data.quizStats)data.quizStats={};if(!Array.isArray(data.profile.subjects))data.profile.subjects=baseData().profile.subjects;data.sets=data.sets.map(s=>({...s,topics:Array.isArray(s.topics)?s.topics:[],documents:Array.isArray(s.documents)?s.documents:[]}));}catch(e){data=baseData();}
+function normalizeData(raw){
+ const base=baseData(),obj=raw&&typeof raw==="object"&&!Array.isArray(raw)?raw:{},p=obj.profile&&typeof obj.profile==="object"?obj.profile:{};
+ const subjects=unique((Array.isArray(p.subjects)?p.subjects:base.profile.subjects).filter(x=>typeof x==="string").map(x=>x.trim()).filter(Boolean)).slice(0,30);
+ const sets=(Array.isArray(obj.sets)?obj.sets:[]).filter(s=>s&&typeof s==="object"&&!Array.isArray(s)&&typeof s.title==="string"&&s.title.trim()).map(s=>{
+  const sid=String(s.id||uid()),topics=(Array.isArray(s.topics)?s.topics:[]).filter(t=>t&&typeof t==="object"&&!Array.isArray(t)&&String(t.title||"").trim()).map(t=>{
+   const tid=String(t.id||uid()),cards=(Array.isArray(t.cards)?t.cards:[]).filter(c=>c&&typeof c==="object"&&!Array.isArray(c)&&String(c.question||"").trim()&&String(c.answer||"").trim()).map(c=>({id:String(c.id||uid()),question:String(c.question).slice(0,800),answer:String(c.answer).slice(0,1500),source:String(c.source||"").slice(0,2000)}));
+   const questions=(Array.isArray(t.questions)?t.questions:[]).filter(q=>q&&typeof q==="object"&&!Array.isArray(q)&&String(q.prompt||"").trim()).map(q=>{
+    let options=unique((Array.isArray(q.options)?q.options:[]).filter(x=>typeof x==="string").map(x=>x.slice(0,500)));
+    if(options.length<2)options=["Richtig","Falsch"];
+    let correctIndex=Number(q.correctIndex);if(!Number.isInteger(correctIndex)||correctIndex<0||correctIndex>=options.length)correctIndex=0;
+    return {id:String(q.id||uid()),prompt:String(q.prompt).slice(0,1500),options:options.slice(0,6),correctIndex:Math.min(correctIndex,Math.min(options.length,6)-1),explanation:String(q.explanation||"").slice(0,2000),topicTitle:String(q.topicTitle||t.title).slice(0,100)};
+   });
+   return {id:tid,title:String(t.title).trim().slice(0,120),summary:(Array.isArray(t.summary)?t.summary:[]).filter(x=>typeof x==="string").map(x=>x.slice(0,1500)).slice(0,12),cards,questions,sourceText:String(t.sourceText||"").slice(0,40000),matchMode:t.matchMode==="matched"?"matched":"general"};
+  });
+  return {id:sid,title:String(s.title).trim().slice(0,100),subject:String(s.subject||"Sonstiges").slice(0,80),exam:String(s.exam||"Lernset").slice(0,60),grade:Math.min(13,Math.max(1,Number(s.grade)||Number(p.grade)||8)),difficulty:["Automatisch","Einfach","Mittel","Anspruchsvoll"].includes(s.difficulty)?s.difficulty:(p.difficulty||"Automatisch"),topicNames:(Array.isArray(s.topicNames)?s.topicNames:topics.map(t=>t.title)).filter(x=>typeof x==="string").map(x=>x.slice(0,120)).slice(0,12),content:String(s.content||"").slice(0,120000),documents:(Array.isArray(s.documents)?s.documents:[]).filter(x=>typeof x==="string").map(x=>x.slice(0,255)).slice(0,8),topics,createdAt:s.createdAt&&Number.isFinite(Date.parse(s.createdAt))?s.createdAt:new Date().toISOString()};
+ });
+ const reviews={};if(obj.reviews&&typeof obj.reviews==="object"&&!Array.isArray(obj.reviews))for(const [id,r] of Object.entries(obj.reviews).slice(0,5000)){if(!r||typeof r!=="object")continue;reviews[String(id).slice(0,160)]={level:Math.min(4,Math.max(0,Number(r.level)||0)),dueAt:typeof r.dueAt==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(r.dueAt)?r.dueAt:todayKey,lastAt:typeof r.lastAt==="string"?r.lastAt:"",rating:r.rating==="known"?"known":"again"};}
+ const quizStats={};if(obj.quizStats&&typeof obj.quizStats==="object"&&!Array.isArray(obj.quizStats))for(const [id,r] of Object.entries(obj.quizStats).slice(0,2000)){if(!r||typeof r!=="object")continue;quizStats[String(id).slice(0,160)]={played:Math.max(0,Number(r.played)||0),correct:Math.max(0,Number(r.correct)||0),total:Math.max(0,Number(r.total)||0),lastAt:typeof r.lastAt==="string"?r.lastAt:""};}
+ const grade=Number(p.grade);
+ return {profile:{setupDone:Boolean(p.setupDone),school:typeof p.school==="string"?p.school:base.profile.school,grade:Number.isInteger(grade)&&grade>=1&&grade<=13?grade:base.profile.grade,difficulty:["Automatisch","Einfach","Mittel","Anspruchsvoll"].includes(p.difficulty)?p.difficulty:"Automatisch",subjects:subjects.length?subjects:base.profile.subjects},sets,reviews,quizStats,lastOpened:typeof obj.lastOpened==="string"?obj.lastOpened:""};
+}
+let data;
+try{data=normalizeData(JSON.parse(localStorage.getItem(KEY)||"null"));}catch(e){data=baseData();}
 let view="home",subjectFilter="",setId="",topicId="",session=null,returnView="home",pendingFiles=[],processing=false,toastTimer=null;
 function save(){try{localStorage.setItem(KEY,JSON.stringify(data));return true;}catch(e){notify("Speicher voll. Exportiere ein Backup oder entferne ein Lernset.");return false;}}
 function notify(t){const e=$("toast");if(!e)return;e.textContent=t;e.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>e.classList.remove("show"),3000);}
@@ -135,10 +157,12 @@ function topicScore(sentence,topic){
  const ignored=new Set(["und","oder","der","die","das","den","dem","des","ein","eine","einer","eines","einem","einen","mit","von","für","zum","zur","über","unter","the","and","aus","bei","thema","krieg","weltkrieg"]);
  const words=t.split(/[^a-zäöüß0-9]+/).filter(w=>w.length>=3&&!ignored.has(w));
  let score=words.reduce((n,w)=>n+(s.includes(w)?1:0),0);
+ if(/weltkrieg/.test(t)&&/weltkrieg/.test(s))score+=3;
+ if(/zweiter weltkrieg/.test(t)&&/zweite[rn]? weltkrieg/.test(s))score+=2;
  const aliases=[
-  [/beginn|ausbruch|start/,["begann","beginnt","ausbruch","überfall","invasion","1939","ausgelöst"]],
-  [/kriegseintritt|usa|vereinigte staaten|pearl harbor/,["usa","vereinigte staaten","pearl harbor","1941","traten","trat","angriff"]],
-  [/ende|kapitulation|kriegsende|niederlage/,["endete","kapitulation","1945","beendete","sieg","niederlage"]],
+  [/beginn|ausbruch|start/,["begann","beginnt","ausbruch","überfall","invasion","ausgelöst"]],
+  [/kriegseintritt|usa|vereinigte staaten|pearl harbor/,["usa","vereinigte staaten","pearl harbor","traten","trat","angriff","kriegseintritt"]],
+  [/ende|kapitulation|kriegsende|niederlage/,["endete","kapitulation","beendete","sieg","niederlage"]],
   [/ursach|grund|auslöser/,["ursache","ursachen","grund","auslöser","aufgrund","deshalb","führte zu"]],
   [/folgen|auswirkung|konsequenz/,["folge","folgen","auswirkung","wiederaufbau","verlust","veränderung"]],
   [/fried|vertrag|abkommen/,["frieden","vertrag","abkommen","unterzeichnet","gründeten"]]
@@ -154,11 +178,17 @@ function bestFacts(text,topic){
 }
 function levelSettings(grade,difficulty){
  const g=Number(grade)||8,mode=difficulty&&difficulty!=="Automatisch"?difficulty:(g<=4?"Einfach":g<=9?"Mittel":"Anspruchsvoll");
- const simple=mode==="Einfach"||(difficulty==="Automatisch"&&g<=4);
- return {grade:g,level:mode,summaryLimit:simple?3:5,cardLimit:simple?8:g<=7?12:g<=9?16:24,quizLimit:mode==="Anspruchsvoll"?12:simple?5:g<=7?7:9};
+ const simple=mode==="Einfach";
+ return {grade:g,level:mode,summaryLimit:simple?3:mode==="Anspruchsvoll"?6:5,cardLimit:simple?8:mode==="Anspruchsvoll"?24:g<=7?12:g<=9?16:24,quizLimit:simple?5:mode==="Anspruchsvoll"?12:g<=7?7:g<=9?9:12};
 }
 function escRegex(s){return s.replace(/[.*+?^$()|[\]\\]/g,"\\$&");}
-function optionsFor(answer,pool){const opts=unique(pool.filter(x=>x!==answer&&String(x).trim()));const backup=["Keine der anderen Angaben","Eine andere Jahreszahl","Ein anderes Ereignis","Keine passende Antwort"];while(opts.length<3){const x=backup.find(y=>y!==answer&&!opts.includes(y));if(!x)break;opts.push(x);}const all=[answer,...opts.slice(0,3)];for(let i=all.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[all[i],all[j]]=[all[j],all[i]];}return all;}
+function optionsFor(answer,pool){
+ const seen=new Set(),others=[];
+ for(const raw of pool){const x=String(raw||"").trim(),key=x.toLocaleLowerCase("de");if(!x||key===String(answer).toLocaleLowerCase("de")||seen.has(key))continue;seen.add(key);others.push(x);if(others.length>=3)break;}
+ const all=[String(answer),...others];
+ for(let i=all.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[all[i],all[j]]=[all[j],all[i]];}
+ return all;
+}
 function makeCards(text,title,set,tId,settings){
  const facts=bestFacts(text,title),out=[];
  facts.forEach((s,i)=>{
@@ -172,14 +202,18 @@ function makeCards(text,title,set,tId,settings){
  if(!out.length&&String(text||"").trim())out.push({id:set+"-"+tId+"-c0",question:"Was weißt du über "+title+"?",answer:String(text).trim().slice(0,500),source:String(text).trim().slice(0,500)});
  return out.slice(0,settings.cardLimit);
 }
-function makeFalseStatement(sentence,termList){
- const year=sentence.match(/\b(?:18|19|20)\d{2}\b/);
- if(year){const n=Number(year[0]),wrong=String(n+(n%2?2:3));return sentence.replace(year[0],wrong);}
- const existing=termList.filter(t=>sentence.toLocaleLowerCase("de").includes(t.toLocaleLowerCase("de"))).sort((a,b)=>b.length-a.length)[0];
- const replacement=termList.find(t=>t!==existing&&t.length<30);
+function makeFalseStatement(sentence,termList,allYears){
+ const years=allYears||[],year=sentence.match(/\b(?:18|19|20)\d{2}\b/);
+ if(year){
+  const n=Number(year[0]),candidates=[n+2,n-2,n+3,n-3].map(String),wrong=candidates.find(x=>!years.includes(x)&&x!==year[0]);
+  if(wrong)return sentence.replace(year[0],wrong);
+ }
+ const lower=sentence.toLocaleLowerCase("de");
+ const existing=termList.filter(t=>lower.includes(t.toLocaleLowerCase("de"))).sort((a,b)=>b.length-a.length)[0];
+ const replacement=termList.find(t=>t!==existing&&t.length<30&&!lower.includes(t.toLocaleLowerCase("de")));
  if(existing&&replacement)return sentence.replace(new RegExp(escRegex(existing),"i"),replacement);
  const verb=sentence.match(/\b(ist|war|sind|waren|wurde|wurden|führte|begann|endete|fand|traten|trat|liegt|bezeichnet|bedeutet)\b/i);
- if(verb)return sentence.replace(verb[0],verb[0]+" nicht");
+ if(verb&&!/\bnicht\b/i.test(sentence))return sentence.replace(verb[0],verb[0]+" nicht");
  return "";
 }
 function makeQuiz(text,title,set,tId,settings){
@@ -192,15 +226,13 @@ function makeQuiz(text,title,set,tId,settings){
    out.push({id:set+"-"+tId+"-q"+out.length,prompt:prompt+s.replace(year[0],"_____"),options:opts,correctIndex:opts.indexOf(year[0]),explanation:s});
   }else{
    const term=termList.filter(x=>s.toLocaleLowerCase("de").includes(x.toLocaleLowerCase("de"))).sort((a,b)=>b.length-a.length)[0];
-   if(term&&s.length>35){
-    const opts=optionsFor(term,termList.filter(x=>x.length<=28)),prompt=settings.level==="Anspruchsvoll"?"Welcher Begriff passt fachlich in die Lücke?\n":"Welcher Begriff passt in die Lücke?\n";
+   const distractors=termList.filter(x=>x!==term&&x.length<=28&&!s.toLocaleLowerCase("de").includes(x.toLocaleLowerCase("de")));
+   if(term&&s.length>35&&distractors.length>=2){
+    const opts=optionsFor(term,distractors),prompt=settings.level==="Anspruchsvoll"?"Welcher Begriff passt fachlich in die Lücke?\n":"Welcher Begriff passt in die Lücke?\n";
     out.push({id:set+"-"+tId+"-q"+out.length,prompt:prompt+s.replace(new RegExp(escRegex(term),"i"),"_____"),options:opts,correctIndex:opts.indexOf(term),explanation:s});
    }else out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Richtig oder falsch?\n"+s,options:["Richtig","Falsch"],correctIndex:0,explanation:s});
   }
-  if(out.length<settings.quizLimit&&idx%2===1){
-   const falseText=makeFalseStatement(s,termList);
-   if(falseText&&falseText!==s)out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Richtig oder falsch?\n"+falseText,options:["Richtig","Falsch"],correctIndex:1,explanation:"Im Material steht: "+s});
-  }
+  if(out.length<settings.quizLimit&&idx%2===1){const falseText=makeFalseStatement(s,termList,years);if(falseText&&falseText!==s)out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Richtig oder falsch?\n"+falseText,options:["Richtig","Falsch"],correctIndex:1,explanation:"Im Material steht: "+s});}
  }
  return out.slice(0,settings.quizLimit);
 }
@@ -210,7 +242,7 @@ function makeSet(input){
   const matching=sentences.filter(s=>topicScore(s,title)>0);
   let content=matching.length?matching.join(" "):String(input.text||"");
   if(!content)content=input.text;
-  return {id:uid(),title,summary:bestFacts(content,title).slice(0,settings.summaryLimit),cards:makeCards(content,title,id,"t"+i,settings),questions:makeQuiz(content,title,id,"t"+i,settings),sourceText:content};
+  return {id:uid(),title,summary:bestFacts(content,title).slice(0,settings.summaryLimit),cards:makeCards(content,title,id,"t"+i,settings),questions:makeQuiz(content,title,id,"t"+i,settings),sourceText:content,matchMode:matching.length?"matched":"general"};
  });
  return {id,title:input.title,subject:input.subject,exam:input.exam,grade:settings.grade,difficulty:settings.level,topicNames:names,content:String(input.text||"").slice(0,120000),documents:input.documents||[],topics,createdAt:new Date().toISOString()};
 }
@@ -239,7 +271,33 @@ async function pdfText(file,getWorker,status){
  if(pdf.numPages>limit)parts.push("[Nur die ersten "+limit+" von "+pdf.numPages+" Seiten wurden ausgelesen.]");
  return parts.join("\n");
 }
-async function readFile(file,getWorker,status){const n=file.name.toLowerCase();if(n.endsWith(".txt")||file.type==="text/plain")return file.text();if(n.endsWith(".pdf")||file.type==="application/pdf")return pdfText(file,getWorker,status);if(file.type.startsWith("image/")||/\.(jpg|jpeg|png|webp|heic)$/i.test(n)){const w=await getWorker();status("Foto erkennen: "+file.name);return (await w.recognize(file)).data.text||"";}throw new Error("Dateiformat nicht unterstützt: "+file.name);}
+async function recognizeImage(file,worker){
+ let bitmap=null,objectUrl="",canvas=null;
+ try{
+  let drawable=null,width=0,height=0;
+  if(typeof createImageBitmap==="function"){try{bitmap=await createImageBitmap(file);drawable=bitmap;width=bitmap.width;height=bitmap.height;}catch(e){bitmap=null;}}
+  if(!drawable){
+   objectUrl=URL.createObjectURL(file);
+   drawable=await new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error("Dieses Bildformat kann der Browser nicht öffnen. Bei HEIC bitte das Foto als JPEG exportieren."));img.src=objectUrl;});
+   width=drawable.naturalWidth;height=drawable.naturalHeight;
+  }
+  if(!width||!height)throw new Error("Bildgröße konnte nicht erkannt werden.");
+  const scale=Math.min(1,2400/Math.max(width,height));
+  canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(width*scale));canvas.height=Math.max(1,Math.round(height*scale));
+  const ctx=canvas.getContext("2d");if(!ctx)throw new Error("Bildverarbeitung wird in diesem Browser nicht unterstützt.");
+  ctx.drawImage(drawable,0,0,canvas.width,canvas.height);
+  const result=await worker.recognize(canvas),text=String(result.data&&result.data.text||"").trim();
+  if(!text)throw new Error("Kein lesbarer Text erkannt. Versuche ein schärferes Foto.");
+  return text;
+ }finally{if(canvas){canvas.width=1;canvas.height=1;}if(bitmap&&typeof bitmap.close==="function")bitmap.close();if(objectUrl)URL.revokeObjectURL(objectUrl);}
+}
+async function readFile(file,getWorker,status){
+ const name=file.name.toLowerCase();
+ if(name.endsWith(".txt")||file.type==="text/plain")return file.text();
+ if(name.endsWith(".pdf")||file.type==="application/pdf")return pdfText(file,getWorker,status);
+ if(file.type.startsWith("image/")||/\.(jpg|jpeg|png|webp|heic)$/i.test(name)){const w=await getWorker();status("Foto erkennen: "+file.name);return recognizeImage(file,w);}
+ throw new Error("Dateiformat nicht unterstützt: "+file.name);
+}
 async function readFiles(files,status){let w=null;const getWorker=async()=>{if(!w)w=await createWorker();return w;},parts=[],names=[],errors=[];try{for(let i=0;i<files.length;i++){status("Datei "+(i+1)+" von "+files.length+": "+files[i].name);try{const txt=await readFile(files[i],getWorker,status);if(txt.trim().length>3)parts.push("\n\n--- "+files[i].name+" ---\n"+txt);else errors.push(files[i].name+": kein lesbarer Text erkannt");names.push(files[i].name);}catch(e){errors.push(files[i].name+": "+e.message);}}}finally{if(w)try{await w.terminate();}catch(e){}}return {text:parts.join("\n").slice(0,120000),names,errors};}
 function showFileList(){const el=$("file-list");if(el)el.innerHTML=pendingFiles.map((f,i)=>'<div class="file-chip"><span>'+(f.name.toLowerCase().endsWith(".pdf")?"📄":f.type.startsWith("image/")?"🖼️":"📝")+'</span><span style="flex:1;overflow-wrap:anywhere">'+esc(f.name)+' · '+Math.max(1,Math.round(f.size/1024))+' KB</span><button class="btn small" type="button" data-action="remove-file" data-index="'+i+'">Entfernen</button></div>').join("");}
 function openEditMaterial(id){const s=getSet(id);if(!s)return;modal('<h2>Material bearbeiten</h2><p>Korrigiere den erkannten Text und lass Überblick, Karteikarten und Quiz neu erstellen.</p><form id="edit-form"><input type="hidden" id="edit-id" value="'+esc(s.id)+'"><div class="field"><label for="edit-title">Lernset-Titel</label><input id="edit-title" value="'+esc(s.title)+'" required></div><div class="field" style="margin-top:12px"><label for="edit-content">Erkannter Text</label><textarea id="edit-content" style="min-height:270px" required>'+esc(s.content||"")+'</textarea></div><div class="form-actions"><button class="btn" type="button" data-action="modal-close">Abbrechen</button><button class="btn mint" type="submit">Neu erstellen</button></div></form>');}

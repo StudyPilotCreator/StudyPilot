@@ -18,3 +18,10 @@ GitHub Pages URL: https://studypilotcreator.github.io/StudyPilot/
 
 ## Limitations
 This version does not call a large language model. Summary, flashcard and question generation uses local text rules, so important facts should be checked against class materials. OCR depends on image clarity. First-time PDF/photo processing downloads libraries from CDNs and requires an internet connection. Browser data stays on each device; there is no MacBook–iPhone sync.
+
+
+## Quality improvements
+- Normalises saved and imported study data before rendering.
+- Resizes photos before OCR and attempts browser decoding for HEIC images.
+- Generates only meaningful quiz distractors instead of generic filler choices.
+- Flags topics whose passages could not be confidently matched to source text.
