@@ -1,5 +1,5 @@
-const CACHE_NAME = "studypilot-static-v2";
-const CORE_FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg"];
+const CACHE_NAME = "studypilot-static-v3";
+const CORE_FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg", "./apple-touch-icon.png"];
 
 self.addEventListener("install", event => {
   event.waitUntil(

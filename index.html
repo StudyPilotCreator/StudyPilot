@@ -10,7 +10,7 @@
 <meta name="description" content="Dein persönlicher Tagesplaner für Schule, Sport, Hobbys und Freizeit.">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="./icon.svg">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
 <title>StudyPilot — Dein Tag. Dein Tempo.</title>
 <style>
 :root{color-scheme:dark;--bg:#0d1020;--surface:rgba(27,31,55,.72);--surface2:rgba(39,43,72,.74);--line:rgba(201,204,255,.13);--ink:#f7f7ff;--muted:#a5abc7;--purple:#a69aff;--mint:#82ead0;--yellow:#ffd48a;--pink:#ffa5c2;--shadow:0 20px 60px #0507145c}
@@ -203,8 +203,8 @@ function renderAutoPlan(dateString){
  const lines=plan.scheduled.map(item=>'<div class="plan-line"><div class="plan-time">'+fmtTime(item.start)+'–'+fmtTime(item.end)+'</div><div style="flex:1;min-width:0"><div class="plan-task">'+esc(item.task.title)+' <span class="plan-badge">'+esc(item.task.priority||"Mittel")+'</span></div><div class="plan-detail">'+Number(item.task.duration||25)+' Minuten'+(item.breakAfter?' · danach 5 Minuten Pause':'')+'</div></div></div>').join("");
  let tail="";
  if(plan.openCount===0)tail='<div class="plan-success">✨ Alles erledigt! Du hast gerade keine offenen Aufgaben für diesen Tag.</div>';
- else if(plan.unscheduled.length)tail='<div class="plan-alert">'+plan.unscheduled.length+' Aufgabe(n) passen nicht vollständig in freie Zeit bis 22:00 Uhr. Prüfe deine Termine oder plane Aufgaben auf einen anderen Tag.</div>';
- if(plan.scheduled.length===0&&plan.openCount>0)tail+='<div class="empty">Es gibt kein ausreichend langes freies Zeitfenster für deine offenen Aufgaben. Prüfe deine Termine oder verschiebe Aufgaben auf einen anderen Tag.</div>';
+ else if(plan.unscheduled.length&&plan.scheduled.length)tail='<div class="plan-alert">'+plan.unscheduled.length+' Aufgabe(n) passen nicht vollständig in freie Zeit bis 22:00 Uhr. Prüfe deine Termine oder plane Aufgaben auf einen anderen Tag.</div>';
+ else if(plan.unscheduled.length)tail='<div class="empty">Ich finde für heute kein ausreichend langes freies Zeitfenster. Prüfe deine Termine oder verschiebe Aufgaben auf einen anderen Tag.</div>';
  return '<section class="panel glass auto-plan"><div class="auto-plan-head"><div><h2>Dein automatischer Plan</h2><div class="small-text" style="margin-top:4px">Freie Zeit zwischen festen Terminen</div></div><button class="btn small primary" data-action="auto-plan">↻ Neu berechnen</button></div><div class="plan-note">Der Vorschlag füllt freie Zeit chronologisch. Prioritäten werden berücksichtigt, feste Termine bleiben unverändert. Nach jeweils zwei Aufgaben im selben Zeitfenster wird eine kurze Pause vorgesehen, wenn genug Zeit bleibt.</div>'+conflictHtml+(lines?'<div>'+lines+'</div>':"")+tail+'</section>';
 }
 function renderToday(){

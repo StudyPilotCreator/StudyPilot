@@ -12,6 +12,7 @@ Your personal planner for school, activities, and everyday life.
 - Local browser storage; no account, remote database, or AI API required.
 - JSON backup export and confirmed backup import.
 - Installable web-app structure and offline support; the service worker checks online for newer app versions.
+- Dedicated 180×180 PNG home-screen icon for iPhone.
 
 ## Publish with GitHub Pages
 GitHub Pages publishes the main branch from the repository root.
