@@ -1,7 +1,7 @@
 {
-  "name": "StudyPilot — Dein persönlicher Tagesplaner",
+  "name": "StudyPilot — Dein Lerncoach",
   "short_name": "StudyPilot",
-  "description": "Dein Wochenplan für Schule, Sport, Termine und Freizeit.",
+  "description": "Deine Lernsets, Zusammenfassungen, Karteikarten und Quizze in einer lokalen Lern-App.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

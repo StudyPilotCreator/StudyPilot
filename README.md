@@ -1,31 +1,20 @@
-# StudyPilot
+# StudyPilot — Dein Lerncoach
 
-Your personal planner for school, activities, and everyday life.
+The original dark glassmorphism look is kept. The old calendar-first planner is replaced by a local learning workspace.
 
 ## Features
-- First-run setup with separate start and end times for each school day.
-- Flexible weekly hobby goals with chosen days, frequency, session length and preferred time window.
-- Smart daily planning protects fixed appointments, prioritises due tasks, fits hobby sessions into free time, then schedules remaining tasks.
-- Convert a suggested hobby session into a fixed one-off calendar appointment; tracked sessions count toward each weekly hobby target.
-- Tasks can be edited, categorised and given a separate deadline; unfinished tasks are carried to today without changing their deadline.
-- Recurring weekly activities such as sports, music lessons, and clubs.
-- Date-specific tasks with duration and priority.
-- Automatic daily task suggestions around fixed school and activity times.
-- Breaks between task blocks, plus warnings for overlapping fixed appointments.
-- Monthly calendar, weekly routines, and one-off events.
-- Local browser storage; no account, remote database, or AI API required.
-- JSON backup export and confirmed backup import.
-- Installable web-app structure and offline support; the service worker checks online for newer app versions.
-- Dedicated 180×180 PNG home-screen icon for iPhone.
+- First-run setup for school type, class grade, difficulty and subjects.
+- Subject folders and saved study sets for tests, exams, presentations and regular learning.
+- Upload photos, PDFs and TXT files or paste notes. Selectable PDF text is read with PDF.js; image and scanned-page OCR uses Tesseract.js.
+- Files are processed in the browser. Original uploads are not sent to a StudyPilot server; recognised text and generated materials are saved on this device.
+- Automatic topic summaries, flashcards and quiz questions generated with local text-processing rules.
+- Topic quizzes and full-set quizzes.
+- Flashcard review with per-card spaced-repetition scheduling.
+- Saved learning sets, quiz results and JSON backup/restore.
+- Installable PWA, no backend or AI API key required.
 
-## Publish with GitHub Pages
-GitHub Pages publishes the main branch from the repository root.
-Expected URL: https://studypilotcreator.github.io/StudyPilot/
+## Publish
+GitHub Pages URL: https://studypilotcreator.github.io/StudyPilot/
 
-Open this HTTPS URL in Safari on your iPhone and choose Share → Add to Home Screen.
-
-## Data and privacy
-The app stores the schedule, routines, tasks, and events in local browser storage on each device. There is no cross-device synchronization and no remote database. The repository itself is public, so never commit personal schedule data to it; enter personal details only inside the app.
-
-## Planning notes
-The automatic planner is a suggestion, not a calendar write operation. It protects fixed appointments with transition buffers; tasks have a planned work date and a separate deadline; unfinished tasks move to today without changing their deadline. Flexible hobby suggestions become fixed calendar entries only when accepted. Tasks are not split across multiple slots.
+## Limitations
+This version does not call a large language model. Summary, flashcard and question generation uses local text rules, so important facts should be checked against class materials. OCR depends on image clarity. First-time PDF/photo processing downloads libraries from CDNs and requires an internet connection. Browser data stays on each device; there is no MacBook–iPhone sync.
