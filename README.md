@@ -29,3 +29,5 @@ This version does not call a large language model. Summary, flashcard and questi
 - Uploads are limited to 8 files, 20 MB each and 60 MB total; PDFs process at most 15 pages per file.
 - Study sets can be deleted, and topics without confident source-text matches are flagged for review.
 - Backup imports normalise nested topic/card/quiz data before rendering.
+
+- The profile difficulty label updates immediately when the class is changed; rebuilt study sets reset quiz statistics and review schedules tied to the previous cards.
