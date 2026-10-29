@@ -6,7 +6,7 @@ Your personal planner for school, activities, and everyday life.
 - First-run setup with separate start and end times for each school day.
 - Flexible weekly hobby goals with chosen days, frequency, session length and preferred time window.
 - Smart daily planning protects fixed appointments, prioritises due tasks, fits hobby sessions into free time, then schedules remaining tasks.
-- Convert a suggested hobby session into a fixed one-off calendar appointment.
+- Convert a suggested hobby session into a fixed one-off calendar appointment; tracked sessions count toward each weekly hobby target.
 - Tasks can be edited, categorised and given a separate deadline; unfinished tasks are carried to today without changing their deadline.
 - Recurring weekly activities such as sports, music lessons, and clubs.
 - Date-specific tasks with duration and priority.
