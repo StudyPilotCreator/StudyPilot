@@ -25,3 +25,7 @@ This version does not call a large language model. Summary, flashcard and questi
 - Resizes photos before OCR and attempts browser decoding for HEIC images.
 - Generates only meaningful quiz distractors instead of generic filler choices.
 - Flags topics whose passages could not be confidently matched to source text.
+
+- Uploads are limited to 8 files, 20 MB each and 60 MB total; PDFs process at most 15 pages per file.
+- Study sets can be deleted, and topics without confident source-text matches are flagged for review.
+- Backup imports normalise nested topic/card/quiz data before rendering.
