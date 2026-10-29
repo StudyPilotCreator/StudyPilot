@@ -94,6 +94,18 @@
 @media(max-width:370px){.setup-heading{grid-template-columns:1fr}.setup-monogram{width:43px;height:43px}.setup-progress-step{flex-direction:column;align-items:flex-start}.setup-step-copy strong{font-size:9px}.setup-review-row{flex-wrap:wrap}.setup-review-row>.btn{margin-left:auto}.setup-privacy{padding:11px}}
 @media(prefers-reduced-motion:reduce){.setup-content,.setup-monogram,.setup-progress-step,.setup-progress-track span,.setup-subjects .chip,.setup-actions .btn,.panel.glass,.subject-card,.set-card,.topic-card{animation:none!important;transition:none!important;transform:none!important}}
 
+
+.create-loading{display:none;margin-top:13px;padding:13px 14px;border:1px solid #a69aff32;border-radius:14px;background:linear-gradient(120deg,#a69aff0d,#82ead008)}
+.create-loading.active{display:block;animation:appear .22s ease both}
+.create-loading.error{border-color:#ff9db277;background:#5c283922}
+.create-loading-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;color:#d8d4ff;font-size:11px;line-height:1.5}
+#create-progress-percent{font-variant-numeric:tabular-nums;color:#9ff0d9;white-space:nowrap}
+.create-progress-track{height:8px;margin-top:10px;border-radius:99px;overflow:hidden;background:#292d46;border:1px solid #ffffff0a}
+#create-progress-fill{display:block;width:0;height:100%;border-radius:99px;background:linear-gradient(90deg,#a69aff,#82ead0);box-shadow:0 0 16px #82ead044;transition:width .28s ease}
+.create-loading.error #create-progress-fill{background:linear-gradient(90deg,#ff9db2,#ffd48a)}
+.create-loading-note{font-size:10px;line-height:1.5;color:#929bb9;margin-top:8px}
+@media(prefers-reduced-motion:reduce){.create-loading.active{animation:none}#create-progress-fill{transition:none}}
+
 </style>
 </head>
 <body>
@@ -133,7 +145,7 @@ function normalizeData(raw){
 }
 let data;
 try{data=normalizeData(JSON.parse(localStorage.getItem(KEY)||"null"));}catch(e){data=baseData();}
-let view="home",subjectFilter="",setId="",topicId="",session=null,returnView="home",pendingFiles=[],processing=false,toastTimer=null,setupStep=0;
+let view="home",subjectFilter="",setId="",topicId="",session=null,returnView="home",pendingFiles=[],processing=false,toastTimer=null,setupStep=0,searchQuery="";
 function save(){try{localStorage.setItem(KEY,JSON.stringify(data));return true;}catch(e){notify("Speicher voll. Exportiere ein Backup oder entferne ein Lernset.");return false;}}
 function notify(t){const e=$("toast");if(!e)return;e.textContent=t;e.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>e.classList.remove("show"),3000);}
 function gradeDifficulty(g){return g<=4?"Einfach":g<=7?"Einfach bis mittel":g<=9?"Mittel":g<=10?"Mittel bis anspruchsvoll":"Anspruchsvoll";}
@@ -217,9 +229,10 @@ function modal(content){$("modal-root").innerHTML='<div class="modal-backdrop" d
 function closeModal(){ $("modal-root").innerHTML="";pendingFiles=[];processing=false; }
 function openNewSet(subject){
  const subjects=data.profile.subjects.length?data.profile.subjects:SUBJECTS.map(s=>s.name),chosen=subjects.includes(subject)?subject:subjects[0];
- modal('<h2>Neues Lernset erstellen</h2><p>Wähle Fach und Klassenarbeit, lade Themenliste und Inhalte hoch oder füge Text direkt ein. StudyPilot erstellt daraus Übersicht, Karteikarten und Quizfragen.</p><form id="new-set-form"><div class="form-grid"><div class="field"><label for="set-subject">Fach</label><select id="set-subject">'+subjects.map(s=>'<option '+(s===chosen?"selected":"")+'>'+esc(s)+'</option>').join("")+'</select></div><div class="field"><label for="set-exam">Wofür lernst du?</label><select id="set-exam">'+EXAMS.map(s=>'<option '+(s==="Klassenarbeit"?"selected":"")+'>'+esc(s)+'</option>').join("")+'</select></div><div class="field full"><label for="set-title">Name des Lernsets</label><input id="set-title" maxlength="100" required placeholder="z. B. Zweiter Weltkrieg – Klassenarbeit"></div><div class="field full"><label for="set-topics">Themen (optional, ein Thema pro Zeile)</label><textarea id="set-topics" placeholder="Zweiter Weltkrieg&#10;USA und Kriegseintritt&#10;Kriegsende in Europa"></textarea><small>Wenn du Themen vorgibst, ordnet die App Informationen diesen Stichwörtern zu.</small></div><div class="field full"><label>Fotos oder PDFs</label><label for="set-files" class="dropzone"><span style="font-size:27px">📄</span><strong>Material auswählen</strong><span>PDF, JPG, PNG, WEBP, HEIC oder TXT · max. 8 Dateien<br>20 MB je Datei · PDFs: erste 15 Seiten · OCR für Scans</span><input id="set-files" type="file" accept=".pdf,.txt,image/jpeg,image/png,image/webp,image/heic" multiple hidden></label><div id="file-list" class="file-list"></div></div><div class="field full"><label for="set-notes">Oder Text direkt einfügen</label><textarea id="set-notes" style="min-height:125px" placeholder="Kopiere hier deine Mitschrift, Themenliste oder bereits erkannten Text hinein …"></textarea></div></div><div id="create-status" class="small-text" style="margin-top:12px"></div><div class="form-note" style="margin-top:12px">🔒 Deine Dateien werden im Browser ausgelesen und nicht an einen StudyPilot-Server hochgeladen. Die erste Foto-OCR benötigt Internet. Fragen entstehen derzeit durch lokale Textregeln statt ein großes KI-Modell — kontrolliere deshalb wichtige Fakten und die Themenzuordnung.</div><div class="form-actions"><button class="btn" type="button" data-action="modal-close">Abbrechen</button><button class="btn mint" id="create-button" type="submit">✨ Lernmaterial erstellen</button></div></form>');pendingFiles=[];
+ modal('<h2>Neues Lernset erstellen</h2><p>Wähle Fach und Klassenarbeit, lade Themenliste und Inhalte hoch oder füge Text direkt ein. StudyPilot erstellt daraus Übersicht, Karteikarten und Quizfragen.</p><form id="new-set-form"><div class="form-grid"><div class="field"><label for="set-subject">Fach</label><select id="set-subject">'+subjects.map(s=>'<option '+(s===chosen?"selected":"")+'>'+esc(s)+'</option>').join("")+'</select></div><div class="field"><label for="set-exam">Wofür lernst du?</label><select id="set-exam">'+EXAMS.map(s=>'<option '+(s==="Klassenarbeit"?"selected":"")+'>'+esc(s)+'</option>').join("")+'</select></div><div class="field full"><label for="set-title">Name des Lernsets</label><input id="set-title" maxlength="100" required placeholder="z. B. Zweiter Weltkrieg – Klassenarbeit"></div><div class="field full"><label for="set-topics">Themen (optional, ein Thema pro Zeile)</label><textarea id="set-topics" placeholder="Zweiter Weltkrieg&#10;USA und Kriegseintritt&#10;Kriegsende in Europa"></textarea><small>Wenn du Themen vorgibst, ordnet die App Informationen diesen Stichwörtern zu.</small></div><div class="field full"><label>Fotos oder PDFs</label><label for="set-files" class="dropzone"><span style="font-size:27px">📄</span><strong>Material auswählen</strong><span>PDF, JPG, PNG, WEBP, HEIC oder TXT · max. 8 Dateien<br>20 MB je Datei · PDFs: erste 15 Seiten · OCR für Scans</span><input id="set-files" type="file" accept=".pdf,.txt,image/jpeg,image/png,image/webp,image/heic" multiple hidden></label><div id="file-list" class="file-list"></div></div><div class="field full"><label for="set-notes">Oder Text direkt einfügen</label><textarea id="set-notes" style="min-height:125px" placeholder="Kopiere hier deine Mitschrift, Themenliste oder bereits erkannten Text hinein …"></textarea></div></div><div id="create-status" class="small-text" style="margin-top:12px" aria-live="polite"></div><div id="create-loading" class="create-loading" aria-hidden="true"><div class="create-loading-head"><span id="create-progress-label">Vorbereitung</span><strong id="create-progress-percent">0%</strong></div><div class="create-progress-track" role="progressbar" aria-label="Lernmaterial wird erstellt" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="create-progress-fill"></span></div><div class="create-loading-note">Fotos und PDFs werden auf diesem Gerät verarbeitet.</div></div><div class="form-note" style="margin-top:12px">🔒 Deine Dateien werden im Browser ausgelesen und nicht an einen StudyPilot-Server hochgeladen. Die erste Foto-OCR benötigt Internet. Fragen entstehen derzeit durch lokale Textregeln statt ein großes KI-Modell — kontrolliere deshalb wichtige Fakten und die Themenzuordnung.</div><div class="form-actions"><button class="btn" type="button" data-action="modal-close">Abbrechen</button><button class="btn mint" id="create-button" type="submit">✨ Lernmaterial erstellen</button></div></form>');pendingFiles=[];
 }
-function splitSentences(text){return String(text||"").replace(/\r/g,"\n").replace(/[•▪◦]/g," ").split(/\n+/).flatMap(x=>x.match(/[^.!?]+[.!?]?/g)||[]).map(x=>x.replace(/\s+/g," ").trim()).filter(x=>x.length>=24&&x.length<=500);}
+function cleanSourceText(text){return String(text||"").normalize("NFC").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g," ").replace(/\uFFFD/g," ").replace(/\u00AD/g,"").replace(/([A-Za-zÄÖÜäöüß])-\s*\n\s*(?=[a-zäöüß])/g,"$1").replace(/\r/g,"\n").replace(/[ \t]+\n/g,"\n").replace(/\n{3,}/g,"\n\n").replace(/[ \t]{2,}/g," ").trim();}
+function splitSentences(text){return cleanSourceText(text).replace(/[•▪◦]/g," ").split(/\n+/).flatMap(x=>x.match(/[^.!?]+[.!?]?/g)||[]).map(x=>x.replace(/\s+/g," ").trim()).filter(x=>x.length>=24&&x.length<=500);}
 const STOP=new Set(["Der","Die","Das","Ein","Eine","Einer","Eines","Einem","Einen","Dann","Dort","Hier","Diese","Dieser","Dieses","Nach","Vor","Seit","Bei","Durch","Damit","Wenn","Weil","Als","Auch","Aber","Oder","Und","Von","Für","Mit","Im","In","Am","An","Auf","Aus","Zum","Zur","Über","Unter","Er","Sie","Es","Wir","Man","Dabei","Wurde","Werden","War","Ist"]);
 function terms(text){const a=String(text||"").match(/\b[A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9-]{2,}(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9-]{2,}){0,2}\b/g)||[],counts={};for(let t of a){t=t.trim().replace(/\s+/g," ");if(t.length>2&&!STOP.has(t))counts[t]=(counts[t]||0)+1;}return Object.keys(counts).sort((a,b)=>counts[b]-counts[a]||b.length-a.length).slice(0,35);}
 function unique(a){return [...new Set(a.filter(Boolean))];}
@@ -264,62 +277,85 @@ function optionsFor(answer,pool){
  for(let i=all.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[all[i],all[j]]=[all[j],all[i]];}
  return all;
 }
+function parseDefinition(sentence){
+ const s=String(sentence||"").trim().replace(/[.!?]+$/,"");
+ const m=s.match(/^(.{2,70}?)\s+(ist|sind|war|waren|bedeutet|bezeichnet)\s+(.{12,240})$/i);
+ if(!m)return null;
+ const term=m[1].replace(/^(der|die|das|ein|eine|einer|eines|einem|einen)\s+/i,"").trim();
+ if(term.length<2||term.split(/\s+/).length>8)return null;
+ return {term,verb:m[2].toLocaleLowerCase("de"),definition:m[3].trim()};
+}
 function makeCards(text,title,set,tId,settings){
- const facts=bestFacts(text,title),out=[];
+ const facts=unique(bestFacts(text,title).map(cleanSourceText).filter(s=>s.length>=24)),out=[];
  facts.forEach((s,i)=>{
-  const year=s.match(/\b(1[89]\d{2}|20\d{2})\b/),def=s.match(/^(.{2,70}?)\s+(ist|war|sind|waren|bezeichnet|bedeutet|nennt man)\s+(.{10,})$/i);
-  let q=settings.grade<=5?"Was ist wichtig zu „"+title+"“?":"Erkläre einen wichtigen Fakt zu „"+title+"“.",a=s;
-  if(i>0)q=settings.grade<=5?"Was ist noch wichtig zu „"+title+"“?":"Nenne einen weiteren wichtigen Fakt zu „"+title+"“ ("+(i+1)+").";
-  if(year){q=settings.grade<=5?"Welches Jahr gehört in die Lücke?\n"+s.replace(year[0],"_____"):"Ergänze die Jahreszahl in dieser Aussage:\n"+s.replace(year[0],"_____");a=year[0];}
-  else if(def){q="Was "+def[2].toLowerCase()+" "+def[1].trim()+"?";a=def[3].replace(/[.!?]+$/,"");}
+  const year=s.match(/\b(1[89]\d{2}|20\d{2})\b/),def=parseDefinition(s);
+  let q=settings.grade<=5?"Was ist wichtig zum Thema „"+title+"“?":"Erkläre einen wichtigen Fakt zum Thema „"+title+"“.",a=s;
+  if(i>0)q=settings.grade<=5?"Was ist noch wichtig zum Thema „"+title+"“?":"Nenne einen weiteren wichtigen Fakt zum Thema „"+title+"“.";
+  if(year){q="Welche Jahreszahl nennt das Material für diese Aussage?\n"+s.replace(year[0],"_____");a=year[0];}
+  else if(def){q="Erkläre den Begriff „"+def.term+"“.";a=def.definition.replace(/[.!?]+$/,"");}
   out.push({id:set+"-"+tId+"-c"+i,question:q,answer:a,source:s});
  });
- if(!out.length&&String(text||"").trim())out.push({id:set+"-"+tId+"-c0",question:"Was weißt du über "+title+"?",answer:String(text).trim().slice(0,500),source:String(text).trim().slice(0,500)});
+ if(!out.length&&String(text||"").trim())out.push({id:set+"-"+tId+"-c0",question:"Was weißt du über „"+title+"“?",answer:cleanSourceText(text).slice(0,500),source:cleanSourceText(text).slice(0,500)});
  return out.slice(0,settings.cardLimit);
 }
 function makeFalseStatement(sentence,termList,allYears){
  const years=allYears||[],year=sentence.match(/\b(?:18|19|20)\d{2}\b/);
  if(year){
-  const n=Number(year[0]),candidates=[n+2,n-2,n+3,n-3].map(String),wrong=candidates.find(x=>!years.includes(x)&&x!==year[0]);
+  const n=Number(year[0]),candidates=[n+1,n-1,n+2,n-2,n+5,n-5].map(String),wrong=candidates.find(x=>!years.includes(x)&&x!==year[0]);
   if(wrong)return sentence.replace(year[0],wrong);
  }
- const lower=sentence.toLocaleLowerCase("de");
- const existing=termList.filter(t=>lower.includes(t.toLocaleLowerCase("de"))).sort((a,b)=>b.length-a.length)[0];
- const replacement=termList.find(t=>t!==existing&&t.length<30&&!lower.includes(t.toLocaleLowerCase("de")));
- if(existing&&replacement)return sentence.replace(new RegExp(escRegex(existing),"i"),replacement);
- const verb=sentence.match(/\b(ist|war|sind|waren|wurde|wurden|führte|begann|endete|fand|traten|trat|liegt|bezeichnet|bedeutet)\b/i);
- if(verb&&!/\bnicht\b/i.test(sentence))return sentence.replace(verb[0],verb[0]+" nicht");
+ const number=sentence.match(/\b\d+(?:[.,]\d+)?\b/);
+ if(number){
+  const raw=number[0],n=Number(raw.replace(",",".")),candidates=[n+1,n-1,n+2,n+5].map(x=>String(Number.isInteger(n)?x:Number(x).toFixed(1)));
+  const wrong=candidates.find(x=>x!==raw);
+  if(wrong)return sentence.replace(raw,wrong);
+ }
+ const verb=sentence.match(/\b(ist|sind|war|waren|wurde|wurden|hat|haben|hatte|hatten|wird|werden|beginnt|begann|endet|endete|führt|führte|liegt|liegen|bezeichnet|bedeutet|gehört)\b/i);
+ if(verb&&!/\b(nicht|kein|keine|keiner|keines|keinem|keinen)\b/i.test(sentence))return sentence.replace(verb[0],verb[0]+" nicht");
  return "";
 }
 function makeQuiz(text,title,set,tId,settings){
- const facts=bestFacts(text,title),termList=terms(text),years=unique((String(text||"").match(/\b(?:18|19|20)\d{2}\b/g)||[])),out=[];
- for(let idx=0;idx<facts.length&&out.length<settings.quizLimit;idx++){
-  const s=facts[idx],year=s.match(/\b(?:18|19|20)\d{2}\b/);
-  if(year){
-   let pool=years.filter(x=>x!==year[0]);if(pool.length<3){const n=Number(year[0]);pool=unique(pool.concat([String(n-1),String(n+1),String(n+5)]).filter(x=>x!==year[0]));}
-   const opts=optionsFor(year[0],pool),prompt=settings.grade<=5?"Welches Jahr gehört in die Lücke?\n":"Welche Jahreszahl gehört in diese Aussage?\n";
-   out.push({id:set+"-"+tId+"-q"+out.length,prompt:prompt+s.replace(year[0],"_____"),options:opts,correctIndex:opts.indexOf(year[0]),explanation:s});
-  }else{
-   const term=termList.filter(x=>s.toLocaleLowerCase("de").includes(x.toLocaleLowerCase("de"))).sort((a,b)=>b.length-a.length)[0];
-   const distractors=termList.filter(x=>x!==term&&x.length<=28&&!s.toLocaleLowerCase("de").includes(x.toLocaleLowerCase("de")));
-   if(term&&s.length>35&&distractors.length>=2){
-    const opts=optionsFor(term,distractors),prompt=settings.level==="Anspruchsvoll"?"Welcher Begriff passt fachlich in die Lücke?\n":"Welcher Begriff passt in die Lücke?\n";
-    out.push({id:set+"-"+tId+"-q"+out.length,prompt:prompt+s.replace(new RegExp(escRegex(term),"i"),"_____"),options:opts,correctIndex:opts.indexOf(term),explanation:s});
-   }else out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Richtig oder falsch?\n"+s,options:["Richtig","Falsch"],correctIndex:0,explanation:s});
-  }
-  if(out.length<settings.quizLimit&&idx%2===1){const falseText=makeFalseStatement(s,termList,years);if(falseText&&falseText!==s)out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Richtig oder falsch?\n"+falseText,options:["Richtig","Falsch"],correctIndex:1,explanation:"Im Material steht: "+s});}
+ const source=cleanSourceText(text),years=unique((source.match(/\b(?:18|19|20)\d{2}\b/g)||[])),limit=settings.quizLimit,out=[],usedSentences=new Set();
+ const rawFacts=unique(bestFacts(source,title).concat(splitSentences(source).filter(s=>topicScore(s,title)>0))).map(s=>s.trim()).filter(s=>s.length>=35&&s.length<=340&&(s.match(/\S+/g)||[]).length>=6);
+ const facts=rawFacts.length?rawFacts:unique(splitSentences(source)).filter(s=>s.length>=35&&s.length<=340&&(s.match(/\S+/g)||[]).length>=6);
+ for(const s of facts){
+  if(out.length>=limit)break;
+  const year=s.match(/\b(?:18|19|20)\d{2}\b/);if(!year)continue;
+  const n=Number(year[0]),pool=unique(years.filter(x=>x!==year[0]).concat([n-1,n+1,n+2,n+5].map(String))).filter(x=>x!==year[0]);
+  const opts=optionsFor(year[0],pool);
+  if(opts.length<2)continue;
+  out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Welche Jahreszahl gehört in die Lücke?\n"+s.replace(year[0],"_____"),options:opts,correctIndex:opts.indexOf(year[0]),explanation:"Im Material steht: "+s,topicTitle:title});
+  usedSentences.add(s);
  }
- return out.slice(0,settings.quizLimit);
+ const definitions=unique(facts.map(s=>({source:s,definition:parseDefinition(s)})).filter(x=>x.definition).map(x=>({...x,key:x.definition.term.toLocaleLowerCase("de")})).filter((x,i,a)=>a.findIndex(y=>y.key===x.key)===i));
+ if(definitions.length>=3){
+  for(const item of definitions){
+   if(out.length>=limit)break;
+   const otherTerms=definitions.filter(d=>d.key!==item.key).map(d=>d.definition.term),opts=optionsFor(item.definition.term,otherTerms);
+   if(opts.length<3)continue;
+   out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Welcher Begriff passt zu dieser Beschreibung?\n"+item.definition.definition,options:opts,correctIndex:opts.indexOf(item.definition.term),explanation:"Im Material wird „"+item.definition.term+"“ so beschrieben: "+item.definition.definition,topicTitle:title});
+   usedSentences.add(item.source);
+  }
+ }
+ let candidateIndex=0;
+ for(const s of facts){
+  if(out.length>=limit)break;
+  if(usedSentences.has(s))continue;
+  const falseText=makeFalseStatement(s,[],years),useFalse=Boolean(falseText)&&candidateIndex%2===1,statement=useFalse?falseText:s;
+  out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Prüfe die Aussage anhand deiner Unterlagen.\n"+statement,options:["Richtig","Falsch"],correctIndex:useFalse?1:0,explanation:useFalse?"Im Material steht stattdessen: "+s:"Diese Aussage wurde direkt aus dem Material übernommen: "+s,topicTitle:title});
+  candidateIndex++;usedSentences.add(s);
+ }
+ return out.slice(0,limit);
 }
 function makeSet(input){
- const id=uid(),names=chooseTopics(input.text,input.title,input.topicInput),sentences=splitSentences(input.text),settings=levelSettings(input.grade,input.difficulty);
+ const source=cleanSourceText(input.text),id=uid(),names=chooseTopics(source,input.title,input.topicInput),sentences=splitSentences(source),settings=levelSettings(input.grade,input.difficulty);
  const topics=names.map((title,i)=>{
   const matching=sentences.filter(s=>topicScore(s,title)>0);
-  let content=matching.length?matching.join(" "):String(input.text||"");
-  if(!content)content=input.text;
+  let content=matching.length?matching.join(" "):source;
+  if(!content)content=source;
   return {id:uid(),title,summary:bestFacts(content,title).slice(0,settings.summaryLimit),cards:makeCards(content,title,id,"t"+i,settings),questions:makeQuiz(content,title,id,"t"+i,settings),sourceText:content,matchMode:matching.length?"matched":"general"};
  });
- return {id,title:input.title,subject:input.subject,exam:input.exam,grade:settings.grade,difficulty:settings.level,topicNames:names,content:String(input.text||"").slice(0,120000),documents:input.documents||[],topics,createdAt:new Date().toISOString()};
+ return {id,title:input.title,subject:input.subject,exam:input.exam,grade:settings.grade,difficulty:settings.level,topicNames:names,content:source.slice(0,120000),documents:input.documents||[],topics,createdAt:new Date().toISOString()};
 }
 function loadScript(src,test){return new Promise((resolve,reject)=>{if(test()){resolve();return;}const x=document.createElement("script");x.src=src;x.async=true;x.onload=()=>test()?resolve():reject(new Error("Bibliothek nicht verfügbar."));x.onerror=()=>reject(new Error("Bibliothek konnte nicht geladen werden. Prüfe deine Internetverbindung."));document.head.appendChild(x);});}
 async function ensurePdf(){await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js",()=>!!window.pdfjsLib);pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";}
@@ -431,9 +467,9 @@ document.addEventListener("submit",async e=>{
   e.preventDefault();if(processing)return;
   const title=$("set-title").value.trim(),subject=$("set-subject").value,exam=$("set-exam").value,topicInput=$("set-topics").value;let txt=$("set-notes").value.trim();const files=pendingFiles.slice();
   if(!title){notify("Gib dem Lernset einen Namen.");return;}if(!txt&&!files.length){notify("Füge eine Datei oder Text ein.");return;}
-  processing=true;const btn=$("create-button");btn.disabled=true;const status=m=>{const n=$("create-status");if(n)n.textContent=m;};status("Lernmaterial wird vorbereitet …");
+  processing=true;const btn=$("create-button"),loader=$("create-loading"),progressTrack=loader&&loader.querySelector(".create-progress-track"),fill=$("create-progress-fill"),label=$("create-progress-label"),percent=$("create-progress-percent"),originalButton=btn.textContent;let progressValue=0;btn.disabled=true;btn.setAttribute("aria-busy","true");btn.textContent="⏳ Wird erstellt …";if(loader){loader.classList.remove("error");loader.classList.add("active");loader.setAttribute("aria-hidden","false");}const updateProgress=value=>{progressValue=Math.max(progressValue,Math.min(100,Math.round(value)));if(fill)fill.style.width=progressValue+"%";if(percent)percent.textContent=progressValue+"%";if(progressTrack)progressTrack.setAttribute("aria-valuenow",String(progressValue));};const status=m=>{const message=String(m||"");const n=$("create-status");if(n)n.textContent=message;if(label)label.textContent=message;let value=14;const fm=message.match(/Datei\s+(\d+)\s+von\s+(\d+)/i),pm=message.match(/PDF lesen:\s*Seite\s+(\d+)\s+von\s+(\d+)/i);if(/Lernmaterial wird vorbereitet/i.test(message))value=6;else if(fm)value=12+(Number(fm[1])-1)/Math.max(1,Number(fm[2]))*62;else if(pm)value=25+Number(pm[1])/Math.max(1,Number(pm[2]))*45;else if(/Foto erkennen/i.test(message))value=48;else if(/Erstelle Übersicht/i.test(message))value=86;updateProgress(value);};status("Lernmaterial wird vorbereitet …");
   try{let docs=[],errors=[];if(files.length){const r=await readFiles(files,status);txt=(txt+"\n\n"+r.text).trim();docs=r.names;errors=r.errors;}if(txt.length<25)throw new Error("Zu wenig lesbarer Text erkannt. Versuche ein schärferes Foto oder füge Text ein.");status("Erstelle Übersicht, Karteikarten und Quizfragen …");const s=makeSet({title,subject,exam,topicInput,text:txt,documents:docs,grade:data.profile.grade,difficulty:data.profile.difficulty});data.sets.unshift(s);data.lastOpened=s.id;const ok=save();closeModal();setId=s.id;view="set";renderApp();notify("Lernset erstellt: "+s.topics.length+" Themen, "+s.topics.reduce((n,t)=>n+t.cards.length,0)+" Karten und "+s.topics.reduce((n,t)=>n+t.questions.length,0)+" Fragen."+(ok?"":" Speicher prüfen."));if(errors.length)alert("Einige Dateien konnten nicht gelesen werden:\n"+errors.join("\n")+"\n\nDu kannst den Text über „Material bearbeiten“ ergänzen.");}
-  catch(err){status(err.message||"Ein Fehler ist aufgetreten.");btn.disabled=false;notify("Lernset konnte nicht erstellt werden.");}
+  catch(err){status(err.message||"Ein Fehler ist aufgetreten.");if(loader)loader.classList.add("error");updateProgress(100);btn.disabled=false;btn.removeAttribute("aria-busy");btn.textContent=originalButton;notify("Lernset konnte nicht erstellt werden.");}
   finally{processing=false;}return;
  }
  if(e.target.id==="edit-form"){e.preventDefault();const old=getSet($("edit-id").value),txt=$("edit-content").value.trim(),title=$("edit-title").value.trim();if(!old||txt.length<25||!title){notify("Bitte gib einen Titel und mindestens 25 Zeichen Text ein.");return;}const oldCardIds=new Set(old.topics.flatMap(t=>t.cards.map(c=>c.id)));const s=makeSet({title,subject:old.subject,exam:old.exam,topicInput:(old.topicNames||[]).join("\n"),text:txt,documents:old.documents||[],grade:old.grade||data.profile.grade,difficulty:old.difficulty||data.profile.difficulty});s.id=old.id;s.createdAt=old.createdAt;for(const cardId of oldCardIds)delete data.reviews[cardId];delete data.quizStats[old.id];data.sets=data.sets.map(x=>x.id===old.id?s:x);save();closeModal();setId=s.id;view="set";renderApp();notify("Lernmaterial neu erstellt.");return;}
