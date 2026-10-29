@@ -153,10 +153,14 @@ function getPlanConflicts(dateString){
 }
 function autoPlan(dateString){
  const now=new Date();
- const startAt=dateString===iso(today)?Math.max(7*60,now.getHours()*60+now.getMinutes()+5):7*60;
+ const baseStart=dateString===iso(today)?Math.max(7*60,now.getHours()*60+now.getMinutes()+5):7*60;
+ const day=mondayIndex(parseDate(dateString));
+ const schoolDay=(data.school.hours||[]).find(h=>Number(h.day)===day&&h.enabled);
+ // On school days, do not suggest tasks before classes. Leave a small reset buffer after school.
+ const startAt=schoolDay?Math.max(baseStart,timeM(schoolDay.end)+10):baseStart;
  const endAt=22*60;
  const fixed=allItems(dateString)
-  .map(it=>({start:timeM(it.start),end:timeM(it.end)}))
+  .map(it=>({start:Math.max(0,timeM(it.start)-10),end:Math.min(endAt,timeM(it.end)+10)}))
   .filter(it=>Number.isFinite(it.start)&&Number.isFinite(it.end)&&it.end>it.start&&it.end>startAt&&it.start<endAt)
   .sort((a,b)=>a.start-b.start);
  const slots=[];
