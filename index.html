@@ -376,13 +376,20 @@ function makeFalseStatement(sentence,termList,allYears){
   const wrong=candidates.find(x=>x!==raw);
   if(wrong)return sentence.replace(raw,wrong);
  }
+ if(/\b(nicht|kein|keine|keiner|keines|keinem|keinen)\b/i.test(sentence))return "";
+ const verb=sentence.match(/\b(ist|sind|war|waren|lebt|lebte|lebten|leben|arbeitet|arbeitete|arbeiteten|arbeiten|betet|betete|beteten|beten|stand|standen|lag|lagen|befand|befanden|herrschte|herrschten|entstand|entstanden|blieb|blieben|stieg|stiegen|sank|sanken|kämpfte|kämpften|musste|mussten|muss|müssen|kann|können|konnte|konnten|durfte|durften)\b/i);
+ if(verb){
+  const after=sentence.slice(verb.index+verb[0].length);
+  if(after.trim().length<4)return "";
+  return sentence.slice(0,verb.index+verb[0].length)+" nicht"+after;
+ }
  return "";
 }
 
 function makeQuiz(text,title,set,tId,settings){
  const source=cleanSourceText(text),years=unique((source.match(/\b(?:18|19|20)\d{2}\b/g)||[])),limit=settings.quizLimit,out=[],usedSentences=new Set();
- const sentencePool=unique(splitSentences(source)).filter(s=>s.length>=24&&s.length<=340&&(s.match(/\S+/g)||[]).length>=5),matching=sentencePool.filter(s=>topicScore(s,title)>0),focused=matching.length>=2&&matching.length/Math.max(1,sentencePool.length)>=0.25;
- const facts=(focused?matching:sentencePool).slice(0,Math.max(limit*2,20));
+ const sentencePool=unique(splitSentences(source)).filter(s=>s.length>=24&&s.length<=340&&(s.match(/\S+/g)||[]).length>=5),matching=sentencePool.filter(s=>topicScore(s,title)>0);
+ const facts=(matching.length?matching:sentencePool).slice(0,Math.max(limit*2,20));
  for(const s of facts){
   if(out.length>=limit)break;
   const year=s.match(/\b(?:18|19|20)\d{2}\b/);if(!year)continue;
