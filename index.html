@@ -378,6 +378,8 @@ function makeFalseStatement(sentence,termList,allYears){
  }
  if(/\b(nicht|kein|keine|keiner|keines|keinem|keinen)\b/i.test(sentence))return "";
  const verb=sentence.match(/\b(ist|sind|war|waren|lebt|lebte|lebten|leben|arbeitet|arbeitete|arbeiteten|arbeiten|betet|betete|beteten|beten|stand|standen|lag|lagen|befand|befanden|herrschte|herrschten|entstand|entstanden|blieb|blieben|stieg|stiegen|sank|sanken|kämpfte|kämpften|musste|mussten|muss|müssen|kann|können|konnte|konnten|durfte|durften)\b/i);
+ const modal=sentence.match(/\b(musste|mussten|muss|müssen)\s+([A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)\b/);
+ if(modal){const noun=modal[2],negative=/(?:en|e|er|s)$/i.test(noun)?"keine":"kein";return sentence.replace(modal[0],modal[1]+" "+negative+" "+noun);}
  if(verb){
   const after=sentence.slice(verb.index+verb[0].length);
   if(after.trim().length<4)return "";
