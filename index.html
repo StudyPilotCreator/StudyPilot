@@ -289,7 +289,7 @@ function topicScore(sentence,topic){
 }
 function bestFacts(text,topic){
  const sentences=splitSentences(text),matching=topic?sentences.filter(s=>topicScore(s,topic)>0):sentences;
- const coverage=matching.length/Math.max(1,sentences.length),a=matching.length>=2&&coverage>=0.25?matching:sentences;
+ const a=matching.length?matching:sentences;
  const rank=a.map((s,i)=>({s,i,score:(/\b(19\d{2}|20\d{2})\b/.test(s)?3:0)+(/\b(weil|deshalb|dadurch|folglich|daher|führte|verursachte|bedeutet|ist|war)\b/i.test(s)?2:0)+(s.length>60&&s.length<260?2:0)})).sort((x,y)=>y.score-x.score||x.i-y.i);
  return rank.length?rank.slice(0,6).map(x=>x.s):String(text||"").trim()?[String(text).trim().slice(0,280)]:[];
 }
@@ -320,29 +320,29 @@ function extractFactQuestion(sentence){
  const s=String(sentence||"").trim().replace(/[.!?]+$/,"");
  let m=s.match(/^(.{2,55}?)\s+(musste|mussten)\s+(.{5,180})$/i);
  if(m&&!/^(im|in|am|an|auf|unter|über|nach|vor|seit|durch|er|sie|es|diese[rn]?)\b/i.test(m[1])){
-  return {type:"what",prompt:"Was mussten "+m[1]+" tun?",answer:m[3].replace(/[.!?]+$/,""),source:s};
+  const subject=m[1].charAt(0).toLocaleLowerCase("de")+m[1].slice(1);return {type:"what",prompt:"Was "+m[2]+" "+subject+" tun?",answer:m[3].replace(/[.!?]+$/,""),source:s};
  }
  m=s.match(/^(.{2,55}?)\s+(arbeitete|arbeiteten|lebte|lebten|stand|standen|lag|lagen)\s+((?:im|in|am|an|auf|unter|über|bei|auf dem|in der)\s+.{3,140})$/i);
  if(m&&!/^(im|in|am|an|auf|unter|über|nach|vor|seit|durch|er|sie|es)\b/i.test(m[1])){
   const verb=m[2].toLocaleLowerCase("de"),questionVerb=/arbeitete/.test(verb)?"arbeiteten":/lebte/.test(verb)?"lebten":/stand/.test(verb)?"stand":"lag";
   const plural=/(arbeiteten|lebten|standen|lagen)/.test(verb);
-  const prompt=(/arbeitete/.test(verb)?"Wo "+questionVerb: /lebte/.test(verb)?"Wo "+questionVerb: /stand/.test(verb)?"Wo "+questionVerb:"Wo "+questionVerb)+" "+m[1]+"?";
+  const subject=m[1].charAt(0).toLocaleLowerCase("de")+m[1].slice(1),prompt="Wo "+m[2]+" "+subject+"?";
   return {type:"where",prompt,answer:m[3].replace(/[.!?]+$/,""),source:s};
  }
  m=s.match(/^(.{2,55}?)\s+(betete|beteten)\s+(.{3,140})$/i);
  if(m&&!/^(im|in|am|an|auf|unter|über|nach|vor|seit|durch|er|sie|es)\b/i.test(m[1])){
-  return {type:"when",prompt:"Wie oft beteten "+m[1]+"?",answer:m[3].replace(/[.!?]+$/,""),source:s};
+  const subject=m[1].charAt(0).toLocaleLowerCase("de")+m[1].slice(1);return {type:"when",prompt:"Wie oft "+m[2]+" "+subject+"?",answer:m[3].replace(/[.!?]+$/,""),source:s};
  }
- m=s.match(/^(.{2,55}?)\s+(besiegte|besiegten|überfiel|überfielen|regierte|regierten|griff|griffen)\s+(.{2,120}?)\s+an?$/i);
+ m=s.match(/^(.{2,55}?)\s+(besiegte|besiegten|überfiel|überfielen|regierte|regierten|griff|griffen)\s+(.{2,120})$/i);
  if(m&&!/^(im|in|am|an|auf|unter|über|nach|vor|seit|durch|er|sie|es)\b/i.test(m[1])){
   const verb=m[2].toLocaleLowerCase("de"),plural=/(besiegten|überfielen|regierten|griffen)/.test(verb),word=/besieg/.test(verb)?"besiegte":/überfiel/.test(verb)?"überfiel":/regier/.test(verb)?"regierte":"griff";
   const qVerb=plural?({besiegte:"besiegten",überfiel:"überfielen",regierte:"regierten",griff:"griffen"}[word]):word;
   const rest=m[3].replace(/\s+an$/i,"");
-  return {type:"whom",prompt:"Wen "+qVerb+" "+m[1]+"?",answer:rest.replace(/[.!?]+$/,""),source:s};
+  const subject=m[1].charAt(0).toLocaleLowerCase("de")+m[1].slice(1);return {type:"whom",prompt:"Wen "+qVerb+" "+subject+"?",answer:rest.replace(/[.!?]+$/,""),source:s};
  }
  m=s.match(/^(.{2,55}?)\s+(leitete|gründete|gründeten|baute|bauten|vergab|verteilte|unterzeichnete|unterzeichneten|entdeckte|entdeckten|erfand|erfanden)\s+(.{3,140})$/i);
  if(m&&!/^(im|in|am|an|auf|unter|über|nach|vor|seit|durch|er|sie|es)\b/i.test(m[1])){
-  return {type:"what",prompt:"Was "+m[2]+" "+m[1]+"?",answer:m[3].replace(/[.!?]+$/,""),source:s};
+  const subject=m[1].charAt(0).toLocaleLowerCase("de")+m[1].slice(1);return {type:"what",prompt:"Was "+m[2]+" "+subject+"?",answer:m[3].replace(/[.!?]+$/,""),source:s};
  }
  return null;
 }
@@ -422,7 +422,7 @@ function makeQuiz(text,title,set,tId,settings){
 function makeSet(input){
  const source=cleanSourceText(input.text),id=uid(),names=chooseTopics(source,input.title,input.topicInput),sentences=splitSentences(source),settings=levelSettings(input.grade,input.difficulty);
  const topics=names.map((title,i)=>{
-  const matching=sentences.filter(s=>topicScore(s,title)>0),useMatched=matching.length>=2&&matching.length/Math.max(1,sentences.length)>=0.25;
+  const matching=sentences.filter(s=>topicScore(s,title)>0),useMatched=matching.length>0;
   let content=useMatched?matching.join(" "):source;
   if(!content)content=source;
   return {id:uid(),title,summary:bestFacts(content,title).slice(0,settings.summaryLimit),cards:makeCards(content,title,id,"t"+i,settings),questions:makeQuiz(content,title,id,"t"+i,settings),sourceText:content,matchMode:useMatched?"matched":"general"};
