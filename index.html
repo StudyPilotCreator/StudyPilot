@@ -272,10 +272,14 @@ function topicScore(sentence,topic){
  const has=raw=>new RegExp("(^|[^a-zäöüß0-9])"+escRegex(String(raw).toLocaleLowerCase("de"))+"(?:e|en|er|es|em|ern|n|s)?([^a-zäöüß0-9]|$)","i").test(s);
  const wordMatches=words.reduce((n,w)=>n+(has(w)?1:0),0);
  let score=wordMatches;
- if(words.length>=2&&wordMatches===1)score=0;
  if(/weltkrieg/.test(t)&&has("weltkrieg"))score+=5;
  if(/zweiter weltkrieg/.test(t)&&/zweite[rn]? weltkrieg/.test(s))score+=2;
  const aliases=[
+  [/klosterleben|kloster|mönch|nonne|abt/,["kloster","klöster","mönch","nonne","abt","gebet","beteten","schreiben","handschrift"]],
+  [/könig|herrschaft|regier|mittelalterlicher herrscher/,["könig","könige","herrscher","reich","lehen","vasallen","vasall","treue","herrschaft","regierte","regierten","entscheidung"]],
+  [/ständegesellschaft|stände|gesellschaft/,["stand","stände","adel","klerus","bauer","bauern","geistliche","freie","unfreie"]],
+  [/ritter|burg|burgen/,["ritter","burg","burgen","burggraben","lehen","vasall","ritter"]],
+  [/leben auf dem land|bauer|landwirtschaft/,["bauer","bauern","feld","felder","grundherr","abgaben","abgabe","ernte","land","acker"]],
   [/weltkrieg|krieg/,["deutschland","polen","alliierten","kapitulation","kriegsende","überfall","invasion","besetzung","besetzten","besatzung","front","endete","niederlage","sieg"]],
   [/beginn|ausbruch|start/,["begann","beginnt","ausbruch","überfall","invasion","ausgelöst"]],
   [/kriegseintritt|usa|vereinigte staaten|pearl harbor/,["usa","vereinigte staaten","pearl harbor","traten","trat","angriff","kriegseintritt"]],
