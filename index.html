@@ -381,6 +381,13 @@ function makeFalseStatement(sentence,termList,allYears){
  if(verb){
   const after=sentence.slice(verb.index+verb[0].length);
   if(after.trim().length<4)return "";
+  if(/^(ist|sind|war|waren)$/i.test(verb[0])){
+   const article=after.match(/^\s+(ein|eine|einen|einem|einer|eines)\b/i);
+   if(article){
+    const negative={ein:"kein",eine:"keine",einen:"keinen",einem:"keinem",einer:"keiner",eines:"keines"}[article[1].toLocaleLowerCase("de")];
+    return sentence.slice(0,verb.index+verb[0].length)+after.replace(article[0]," "+negative+" ");
+   }
+  }
   return sentence.slice(0,verb.index+verb[0].length)+" nicht"+after;
  }
  return "";
