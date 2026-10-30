@@ -373,12 +373,16 @@ async function createWorker(){
 function textQuality(text){
  const s=String(text||"").replace(/\s+/g," ").trim(),words=s.match(/[A-Za-zÄÖÜäöüß0-9]+/g)||[];
  if(s.length<35||words.length<6)return {ok:s.length>=25,score:0,reason:"Zu wenig erkannter Text"};
- const letters=(s.match(/[A-Za-zÄÖÜäöüß]/g)||[]).length,digits=(s.match(/\d/g)||[]).length,odd=(s.match(/[^\w\sÄÖÜäöüß.,;:!?()„“"'’%§–—-]/g)||[]).length;
+ const letters=(s.match(/[A-Za-zÄÖÜäöüß]/g)||[]).length,odd=(s.match(/[^\w\sÄÖÜäöüß.,;:!?()„“"'’%§–—-]/g)||[]).length;
  const vowelWords=words.filter(w=>/[aeiouyäöü]/i.test(w)).length,noVowel=words.filter(w=>w.length>=4&&!/[aeiouyäöü]/i.test(w)).length;
- const tiny=words.filter(w=>w.length===1).length,mixed=words.filter(w=>/\d/.test(w)&&/[A-Za-zÄÖÜäöüß]/.test(w)).length;
+ const tiny=words.filter(w=>w.length===1).length,mixedDigits=words.filter(w=>/\d/.test(w)&&/[A-Za-zÄÖÜäöüß]/.test(w)).length;
+ const allCaps=words.filter(w=>w.length>=2&&/^[A-ZÄÖÜ]+$/.test(w)).length;
+ const oddCaps=words.filter(w=>/[a-zäöüß][A-ZÄÖÜ]|[A-ZÄÖÜ][a-zäöüß]+[A-ZÄÖÜ0-9]/.test(w)).length;
  const vowelRatio=letters?((s.match(/[aeiouyäöü]/gi)||[]).length/letters):0;
- const score=100-Math.min(45,Math.max(0,0.30-vowelRatio)*180)-Math.min(35,noVowel/words.length*100)-Math.min(25,tiny/words.length*100)-Math.min(35,mixed/words.length*150)-Math.min(25,odd/Math.max(1,s.length)*250);
- return {ok:score>=57&&vowelWords/words.length>=0.55,score:Math.round(score),reason:"Die Texterkennung ist unsicher ("+Math.round(score)+"% Textqualität). Bitte ein schärferes, geraderes Foto verwenden."};
+ const suspicious=(allCaps+oddCaps+mixedDigits)/words.length;
+ const score=100-Math.min(35,Math.max(0,0.34-vowelRatio)*220)-Math.min(30,noVowel/words.length*130)-Math.min(20,tiny/words.length*100)-Math.min(30,suspicious*180)-Math.min(15,odd/Math.max(1,s.length)*180);
+ const ok=score>=68&&vowelWords/words.length>=0.62&&suspicious<0.12;
+ return {ok,score:Math.round(score),reason:"Die Texterkennung ist unsicher ("+Math.round(score)+"% Textqualität). Bitte ein schärferes, geraderes Foto verwenden."};
 }
 function assertReadableOCR(text,confidence){
  const q=textQuality(text);
