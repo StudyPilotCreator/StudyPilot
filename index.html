@@ -239,7 +239,28 @@ function splitSentences(text){
 const STOP=new Set(["Der","Die","Das","Ein","Eine","Einer","Eines","Einem","Einen","Dann","Dort","Hier","Diese","Dieser","Dieses","Nach","Vor","Seit","Bei","Durch","Damit","Wenn","Weil","Als","Auch","Aber","Oder","Und","Von","Für","Mit","Im","In","Am","An","Auf","Aus","Zum","Zur","Über","Unter","Er","Sie","Es","Wir","Man","Dabei","Wurde","Werden","War","Ist"]);
 function terms(text){const a=String(text||"").match(/\b[A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9-]{2,}(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9-]{2,}){0,2}\b/g)||[],counts={};for(let t of a){t=t.trim().replace(/\s+/g," ");if(t.length>2&&!STOP.has(t))counts[t]=(counts[t]||0)+1;}return Object.keys(counts).sort((a,b)=>counts[b]-counts[a]||b.length-a.length).slice(0,35);}
 function unique(a){return [...new Set(a.filter(Boolean))];}
-function chooseTopics(text,title,input){const p=unique(String(input||"").split(/[\n,;]+/).map(x=>x.trim()).filter(x=>x.length>1)).slice(0,12);if(p.length)return p;const lines=String(text||"").split(/\n+/).map(x=>x.trim()).filter(x=>x.length>2&&x.length<70),stop=/^(inhalt|inhaltsverzeichnis|lernziele|aufgaben|quellen|kapitel|zusammenfassung|arbeitsblatt|name|datum|seite\s+\d+|page\s+\d+|---)/i;const h=unique(lines.filter(x=>!stop.test(x)&&!(/\.(pdf|png|jpe?g|webp|heic|txt)$/i.test(x))&&x.split(/\s+/).length<=7&&!/[.!?]$/.test(x)&&/[A-ZÄÖÜ]/.test(x))).slice(0,8);return h.length>=2?h:[String(title||"Gesamtüberblick")];}
+function parseTopicList(raw){
+ const source=cleanSourceText(raw).replace(/\u2022/g,"\n").replace(/[▪◦]/g,"\n");
+ const out=[],seen=new Set();
+ const ignore=/^(themen?|prüfungsthemen|themenliste|lernziele|inhaltsverzeichnis|inhalt|aufgaben|arbeitsblatt|name|datum|seite\s*\d+|page\s*\d+|klasse\s*\d+)\s*[:：-]?$/i;
+ for(let line of source.split(/\n+/)){
+  line=line.trim().replace(/^seite\s*\d+\s*[:：-]?\s*/i,"");
+  if(!line||ignore.test(line))continue;
+  line=line.replace(/^(?:themen?|prüfungsthemen|themenliste)\s*[:：-]\s*/i,"");
+  const parts=line.split(/[;|•▪◦]+|,(?=\s*[A-ZÄÖÜ])/);
+  for(let part of parts){
+   let item=part.trim().replace(/^(?:[-*•▪◦]+\s*)/,"").replace(/^\(?\d{1,2}[.)]\s*/,"").replace(/^[a-z][.)]\s*/i,"").replace(/^\s*(?:thema\s*\d+\s*[:：-]\s*)/i,"").replace(/\s+/g," ").replace(/^[\s:–—-]+|[\s:–—-]+$/g,"").replace(/[.]+$/,"").trim();
+   if(item.length<2||item.length>100||ignore.test(item))continue;
+   if((item.match(/\S+/g)||[]).length>12)continue;
+   if(/^(?:seite|page)\s*\d+$/i.test(item))continue;
+   const key=item.toLocaleLowerCase("de").replace(/[!?]+$/,"");
+   if(!seen.has(key)){seen.add(key);out.push(item);}
+   if(out.length>=20)return out;
+  }
+ }
+ return out;
+}
+function chooseTopics(text,title,input){const p=parseTopicList(input).slice(0,12);if(p.length)return p;const h=parseTopicList(text).filter(x=>(x.match(/\s+/g)||[]).length<=7).slice(0,8);return h.length>=2?h:[String(title||"Gesamtüberblick")];}
 function topicScore(sentence,topic){
  const s=String(sentence||"").toLocaleLowerCase("de"),t=String(topic||"").toLocaleLowerCase("de");
  const ignored=new Set(["und","oder","der","die","das","den","dem","des","ein","eine","einer","eines","einem","einen","mit","von","für","zum","zur","über","unter","the","and","aus","bei","thema","krieg","weltkrieg"]);
