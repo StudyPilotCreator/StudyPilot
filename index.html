@@ -267,7 +267,7 @@ function parseTopicList(raw){
 function chooseTopics(text,title,input){const p=parseTopicList(input).slice(0,12);if(p.length)return p;const h=parseTopicList(text).filter(x=>(x.match(/\s+/g)||[]).length<=7).slice(0,8);return h.length>=2?h:[String(title||"Gesamtüberblick")];}
 function topicScore(sentence,topic){
  const s=String(sentence||"").toLocaleLowerCase("de"),t=String(topic||"").toLocaleLowerCase("de");
- const ignored=new Set(["und","oder","der","die","das","den","dem","des","ein","eine","einer","eines","einem","einen","mit","von","für","zum","zur","über","unter","the","and","aus","bei","thema","krieg","weltkrieg"]);
+ const ignored=new Set(["und","oder","der","die","das","den","dem","des","ein","eine","einer","eines","einem","einen","mit","von","für","zum","zur","über","unter","the","and","aus","bei","wie","leben","regiert","regieren","thema","krieg","weltkrieg"]);
  const words=t.split(/[^a-zäöüß0-9]+/).filter(w=>w.length>=3&&!ignored.has(w));
  const has=raw=>new RegExp("(^|[^a-zäöüß0-9])"+escRegex(String(raw).toLocaleLowerCase("de"))+"(?:e|en|er|es|em|ern|n|s)?([^a-zäöüß0-9]|$)","i").test(s);
  const wordMatches=words.reduce((n,w)=>n+(has(w)?1:0),0);
@@ -385,7 +385,7 @@ function makeFalseStatement(sentence,termList,allYears){
    const article=after.match(/^\s+(ein|eine|einen|einem|einer|eines)\b/i);
    if(article){
     const negative={ein:"kein",eine:"keine",einen:"keinen",einem:"keinem",einer:"keiner",eines:"keines"}[article[1].toLocaleLowerCase("de")];
-    return sentence.slice(0,verb.index+verb[0].length)+after.replace(article[0]," "+negative+" ");
+    return sentence.slice(0,verb.index+verb[0].length)+after.replace(article[0]," "+negative);
    }
   }
   return sentence.slice(0,verb.index+verb[0].length)+" nicht"+after;
