@@ -480,7 +480,10 @@ async function readFile(file,getWorker,status,allowTopicList=false){
 }
 async function readFiles(files,status,allowTopicList=false){let w=null;const getWorker=async()=>{if(!w)w=await createWorker();return w;},parts=[],names=[],errors=[];try{for(let i=0;i<files.length;i++){status("Datei "+(i+1)+" von "+files.length+": "+files[i].name);try{const txt=await readFile(files[i],getWorker,status,allowTopicList);if(txt.trim().length>3){if(!/\.pdf$/i.test(files[i].name)&&!/\.(jpe?g|png|webp|heic)$/i.test(files[i].name)&&!textQuality(txt,allowTopicList).ok)throw new Error("Der erkannte Text wirkt fehlerhaft. Bitte prüfe die Datei oder füge den Text direkt ein.");parts.push("\n\n--- "+files[i].name+" ---\n"+txt);names.push(files[i].name);}else errors.push(files[i].name+": kein lesbarer Text erkannt");}catch(e){errors.push(files[i].name+": "+e.message);}}}finally{if(w)try{await w.terminate();}catch(e){}}return {text:parts.join("\n").slice(0,120000),names,errors};}
 function showFileList(){const el=$("file-list");if(el)el.innerHTML=pendingFiles.map((f,i)=>'<div class="file-chip"><span>'+(f.name.toLowerCase().endsWith(".pdf")?"📄":f.type.startsWith("image/")?"🖼️":"📝")+'</span><span style="flex:1;overflow-wrap:anywhere">'+esc(f.name)+' · '+Math.max(1,Math.round(f.size/1024))+' KB</span><button class="btn small" type="button" data-action="remove-file" data-index="'+i+'">Entfernen</button></div>').join("");}
-function openEditMaterial(id){const s=getSet(id);if(!s)return;modal('<h2>Material bearbeiten</h2><p>Korrigiere den erkannten Text und lass Überblick, Karteikarten und Quiz neu erstellen.</p><form id="edit-form"><input type="hidden" id="edit-id" value="'+esc(s.id)+'"><div class="field"><label for="edit-title">Lernset-Titel</label><input id="edit-title" value="'+esc(s.title)+'" required></div><div class="field" style="margin-top:12px"><label for="edit-content">Erkannter Text</label><textarea id="edit-content" style="min-height:270px" required>'+esc(s.content||"")+'</textarea></div><div class="form-actions"><button class="btn" type="button" data-action="modal-close">Abbrechen</button><button class="btn mint" type="submit">Neu erstellen</button></div></form>');}
+function openEditMaterial(id){
+ const s=getSet(id);if(!s)return;
+ modal('<h2>Lernmaterial ergänzen</h2><p>Du kannst den Text korrigieren oder neue Schulbuchseiten, Arbeitsblätter und Mitschriften hochladen. Der bisherige Text bleibt erhalten.</p><form id="edit-form"><input type="hidden" id="edit-id" value="'+esc(s.id)+'"><div class="field"><label for="edit-title">Lernset-Titel</label><input id="edit-title" value="'+esc(s.title)+'" required></div><div class="field" style="margin-top:12px"><label for="edit-content">Bisheriger und neuer Text</label><textarea id="edit-content" style="min-height:180px">'+esc(s.content||"")+'</textarea></div><div class="field" style="margin-top:12px"><label for="edit-files">Weitere Dateien hinzufügen (PDF oder Bild)</label><input id="edit-files" type="file" accept=".pdf,.txt,image/jpeg,image/png,image/webp,image/heic" multiple><small>Maximal 8 Dateien, 20 MB je Datei.</small></div><div id="edit-status" class="small-text" style="margin-top:10px" aria-live="polite"></div><div class="form-actions"><button class="btn" type="button" data-action="modal-close">Abbrechen</button><button class="btn mint" id="edit-submit" type="submit">Lernmaterial neu erstellen</button></div></form>');
+}
 function startCards(id,tid,items){const s=id?getSet(id):null,prev=view==="session"?returnView:view;if(!items)items=tid?(getTopic(s,tid)||{}).cards||[]:s?s.topics.flatMap(t=>t.cards.map(c=>({...c,setId:s.id,setTitle:s.title,subject:s.subject,topicTitle:t.title}))):dueCards();if(!items.length){notify("Noch keine Karteikarten vorhanden.");return;}session={kind:"cards",setId:id||null,topicId:tid||null,items:items.map(c=>({...c,setId:c.setId||id,setTitle:c.setTitle||(s&&s.title)||"Wiederholen",subject:c.subject||(s&&s.subject)||"",topicTitle:c.topicTitle||(tid&&s&&getTopic(s,tid)?getTopic(s,tid).title:"")})),index:0,flipped:false};returnView=prev;view="session";renderApp();}
 function startQuiz(id,tid){const s=getSet(id);if(!s){notify("Lernset nicht gefunden.");return;}const prev=view==="session"?returnView:view;let qs=tid?(getTopic(s,tid)||{}).questions||[]:s.topics.flatMap(t=>t.questions.map(q=>({...q,topicTitle:t.title})));qs=qs.slice(0,30);if(!qs.length){notify("Für dieses Thema wurden keine Fragen erstellt.");return;}session={kind:"quiz",setId:s.id,topicId:tid||null,topicTitle:tid?(getTopic(s,tid)||{}).title:"Komplettquiz",items:qs,index:0,answered:false,selectedIndex:-1,responses:[],saved:false};returnView=prev;data.lastOpened=s.id;save();view="session";renderApp();}
 function addDays(key,n){const d=parseDate(key);d.setDate(d.getDate()+n);return iso(d);}
@@ -542,7 +545,34 @@ document.addEventListener("submit",async e=>{
   catch(err){status(err.message||"Ein Fehler ist aufgetreten.");if(loader)loader.classList.add("error");updateProgress(100);btn.disabled=false;btn.removeAttribute("aria-busy");btn.textContent=originalButton;notify("Lernset konnte nicht erstellt werden.");}
   finally{processing=false;}return;
  }
- if(e.target.id==="edit-form"){e.preventDefault();const old=getSet($("edit-id").value),txt=$("edit-content").value.trim(),title=$("edit-title").value.trim();if(!old||txt.length<25||!title){notify("Bitte gib einen Titel und mindestens 25 Zeichen Text ein.");return;}const oldCardIds=new Set(old.topics.flatMap(t=>t.cards.map(c=>c.id)));const s=makeSet({title,subject:old.subject,exam:old.exam,topicInput:(old.topicNames||[]).join("\n"),text:txt,documents:old.documents||[],grade:old.grade||data.profile.grade,difficulty:old.difficulty||data.profile.difficulty});s.id=old.id;s.createdAt=old.createdAt;for(const cardId of oldCardIds)delete data.reviews[cardId];delete data.quizStats[old.id];data.sets=data.sets.map(x=>x.id===old.id?s:x);save();closeModal();setId=s.id;view="set";renderApp();notify("Lernmaterial neu erstellt.");return;}
+ if(e.target.id==="edit-form"){
+  e.preventDefault();
+  const old=getSet($("edit-id").value),title=$("edit-title").value.trim(),files=Array.from($("edit-files").files||[]);
+  let txt=$("edit-content").value.trim();
+  if(!old||!title||(!txt&&!files.length)){notify("Bitte gib einen Titel und Text oder neue Dateien ein.");return;}
+  const btn=$("edit-submit"),status=$("edit-status"),original=btn.textContent;
+  btn.disabled=true;btn.textContent="⏳ Wird verarbeitet …";
+  const updateStatus=m=>{if(status)status.textContent=m;};
+  let fileErrors=[];
+  try{
+   let docs=old.documents||[];
+   if(files.length){
+    const result=await readFiles(files,updateStatus);
+    fileErrors=result.errors;
+    txt=(txt+"\n\n"+result.text).trim();
+    docs=unique(docs.concat(result.names));
+   }
+   if(txt.length<25)throw new Error(fileErrors[0]||"Es wurde zu wenig Lernstoff erkannt. Bitte lade ein weiteres PDF/Foto hoch oder füge mehr Text ein.");
+   const oldCardIds=new Set(old.topics.flatMap(t=>t.cards.map(c=>c.id)));
+   const s=makeSet({title,subject:old.subject,exam:old.exam,topicInput:(old.topicNames||[]).join("\n"),text:txt,documents:docs,grade:old.grade||data.profile.grade,difficulty:old.difficulty||data.profile.difficulty});
+   s.id=old.id;s.createdAt=old.createdAt;
+   for(const cardId of oldCardIds)delete data.reviews[cardId];
+   delete data.quizStats[old.id];data.sets=data.sets.map(x=>x.id===old.id?s:x);save();closeModal();setId=s.id;view="set";renderApp();
+   notify("Lernmaterial aktualisiert: "+s.topics.length+" Themen, "+s.topics.reduce((n,t)=>n+t.cards.length,0)+" Karten und "+s.topics.reduce((n,t)=>n+t.questions.length,0)+" Fragen.");
+   if(fileErrors.length)alert("Einige Dateien konnten nicht gelesen werden:\n"+fileErrors.join("\n"));
+  }catch(err){updateStatus(err.message||"Ein Fehler ist aufgetreten.");btn.disabled=false;btn.textContent=original;}
+  return;
+ }
 });
 if("serviceWorker" in navigator&&location.protocol!=="file:")window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
 renderApp();
