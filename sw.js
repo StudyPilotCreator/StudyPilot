@@ -1,4 +1,4 @@
-const CACHE_NAME = "studypilot-learn-v13";
+const CACHE_NAME = "studypilot-learn-v14";
 const CORE_FILES = ["./","./index.html","./manifest.webmanifest","./icon.svg","./apple-touch-icon.png"];
 self.addEventListener("install",event=>event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(CORE_FILES)).then(()=>self.skipWaiting())));
 self.addEventListener("activate",event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith("studypilot-")&&key!==CACHE_NAME).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
