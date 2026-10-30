@@ -310,18 +310,51 @@ function parseDefinition(sentence){
  const s=String(sentence||"").trim().replace(/[.!?]+$/,"");
  const m=s.match(/^(.{2,70}?)\s+(ist|sind|war|waren|bedeutet|bezeichnet)\s+(.{12,240})$/i);
  if(!m)return null;
+ const verb=m[2].toLocaleLowerCase("de"),definition=m[3].trim();
+ if(/^(ist|sind|war|waren)$/i.test(verb)&&! /^(ein|eine|einer|eines|einem|einen|der|die|das|den|dem|des|als)\b/i.test(definition))return null;
  const term=m[1].replace(/^(der|die|das|ein|eine|einer|eines|einem|einen)\s+/i,"").trim();
  if(term.length<2||term.split(/\s+/).length>8)return null;
- return {term,verb:m[2].toLocaleLowerCase("de"),definition:m[3].trim()};
+ return {term,verb,definition};
+}
+function extractFactQuestion(sentence){
+ const s=String(sentence||"").trim().replace(/[.!?]+$/,"");
+ let m=s.match(/^(.{2,55}?)\s+(musste|mussten)\s+(.{5,180})$/i);
+ if(m&&!/^(im|in|am|an|auf|unter|über|nach|vor|seit|durch|er|sie|es|diese[rn]?)\b/i.test(m[1])){
+  return {type:"what",prompt:"Was mussten "+m[1]+" tun?",answer:m[3].replace(/[.!?]+$/,""),source:s};
+ }
+ m=s.match(/^(.{2,55}?)\s+(arbeitete|arbeiteten|lebte|lebten|stand|standen|lag|lagen)\s+((?:im|in|am|an|auf|unter|über|bei|auf dem|in der)\s+.{3,140})$/i);
+ if(m&&!/^(im|in|am|an|auf|unter|über|nach|vor|seit|durch|er|sie|es)\b/i.test(m[1])){
+  const verb=m[2].toLocaleLowerCase("de"),questionVerb=/arbeitete/.test(verb)?"arbeiteten":/lebte/.test(verb)?"lebten":/stand/.test(verb)?"stand":"lag";
+  const plural=/(arbeiteten|lebten|standen|lagen)/.test(verb);
+  const prompt=(/arbeitete/.test(verb)?"Wo "+questionVerb: /lebte/.test(verb)?"Wo "+questionVerb: /stand/.test(verb)?"Wo "+questionVerb:"Wo "+questionVerb)+" "+m[1]+"?";
+  return {type:"where",prompt,answer:m[3].replace(/[.!?]+$/,""),source:s};
+ }
+ m=s.match(/^(.{2,55}?)\s+(betete|beteten)\s+(.{3,140})$/i);
+ if(m&&!/^(im|in|am|an|auf|unter|über|nach|vor|seit|durch|er|sie|es)\b/i.test(m[1])){
+  return {type:"when",prompt:"Wie oft beteten "+m[1]+"?",answer:m[3].replace(/[.!?]+$/,""),source:s};
+ }
+ m=s.match(/^(.{2,55}?)\s+(besiegte|besiegten|überfiel|überfielen|regierte|regierten|griff|griffen)\s+(.{2,120}?)\s+an?$/i);
+ if(m&&!/^(im|in|am|an|auf|unter|über|nach|vor|seit|durch|er|sie|es)\b/i.test(m[1])){
+  const verb=m[2].toLocaleLowerCase("de"),plural=/(besiegten|überfielen|regierten|griffen)/.test(verb),word=/besieg/.test(verb)?"besiegte":/überfiel/.test(verb)?"überfiel":/regier/.test(verb)?"regierte":"griff";
+  const qVerb=plural?({besiegte:"besiegten",überfiel:"überfielen",regierte:"regierten",griff:"griffen"}[word]):word;
+  const rest=m[3].replace(/\s+an$/i,"");
+  return {type:"whom",prompt:"Wen "+qVerb+" "+m[1]+"?",answer:rest.replace(/[.!?]+$/,""),source:s};
+ }
+ m=s.match(/^(.{2,55}?)\s+(leitete|gründete|gründeten|baute|bauten|vergab|verteilte|unterzeichnete|unterzeichneten|entdeckte|entdeckten|erfand|erfanden)\s+(.{3,140})$/i);
+ if(m&&!/^(im|in|am|an|auf|unter|über|nach|vor|seit|durch|er|sie|es)\b/i.test(m[1])){
+  return {type:"what",prompt:"Was "+m[2]+" "+m[1]+"?",answer:m[3].replace(/[.!?]+$/,""),source:s};
+ }
+ return null;
 }
 function makeCards(text,title,set,tId,settings){
  const facts=unique(bestFacts(text,title).map(cleanSourceText).filter(s=>s.length>=24)),out=[];
  facts.forEach((s,i)=>{
-  const year=s.match(/\b(1[89]\d{2}|20\d{2})\b/),def=parseDefinition(s);
-  let q=settings.grade<=5?"Was ist wichtig zum Thema „"+title+"“?":"Erkläre einen wichtigen Fakt zum Thema „"+title+"“.",a=s;
-  if(i>0)q=settings.grade<=5?"Was ist noch wichtig zum Thema „"+title+"“?":"Nenne einen weiteren wichtigen Fakt zum Thema „"+title+"“.";
+  const year=s.match(/\b(1[89]\d{2}|20\d{2})\b/),def=parseDefinition(s),fact=extractFactQuestion(s);
+  let q=settings.grade<=5?"Was ist wichtig zum Thema „"+title+"“?":"Was sagt das Material über „"+title+"“?",a=s;
   if(year){q="Welche Jahreszahl nennt das Material für diese Aussage?\n"+s.replace(year[0],"_____");a=year[0];}
-  else if(def){q="Erkläre den Begriff „"+def.term+"“.";a=def.definition.replace(/[.!?]+$/,"");}
+  else if(def){q="Was versteht man unter „"+def.term+"“?";a=def.definition.replace(/[.!?]+$/,"");}
+  else if(fact){q=fact.prompt;a=fact.answer;}
+  else if(i>0)q="Nenne einen weiteren wichtigen Fakt zum Thema „"+title+"“.";
   out.push({id:set+"-"+tId+"-c"+i,question:q,answer:a,source:s});
  });
  if(!out.length&&String(text||"").trim())out.push({id:set+"-"+tId+"-c0",question:"Was weißt du über „"+title+"“?",answer:cleanSourceText(text).slice(0,500),source:cleanSourceText(text).slice(0,500)});
@@ -364,6 +397,16 @@ function makeQuiz(text,title,set,tId,settings){
    out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Welcher Begriff passt zu dieser Beschreibung?\n"+item.definition.definition,options:opts,correctIndex:opts.indexOf(item.definition.term),explanation:"Im Material wird „"+item.definition.term+"“ so beschrieben: "+item.definition.definition,topicTitle:title});
    usedSentences.add(item.source);
   }
+ }
+ const factQuestions=facts.map(s=>extractFactQuestion(s)).filter(Boolean);
+ for(const item of factQuestions){
+  if(out.length>=limit)break;
+  if(usedSentences.has(item.source))continue;
+  const pool=factQuestions.filter(other=>other.type===item.type&&other.source!==item.source).map(other=>other.answer);
+  const opts=optionsFor(item.answer,pool);
+  if(opts.length<2)continue;
+  out.push({id:set+"-"+tId+"-q"+out.length,prompt:item.prompt,options:opts,correctIndex:opts.indexOf(item.answer),explanation:"Im Material steht: "+item.source,topicTitle:title});
+  usedSentences.add(item.source);
  }
  let candidateIndex=0;
  for(const s of facts){
