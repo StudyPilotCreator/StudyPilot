@@ -529,7 +529,7 @@ function scoreTableFact(rowTitle,header,answer,headers,rows){
  const important=/jahr|datum|temperatur|niederschlag|höhe|tiefe|länge|breite|fläche|einwohner|anteil|prozent|menge|wert|ergebnis|ursache|folge|funktion|merkmal|hauptstadt|bevölkerung|geschwindigkeit|dauer|kosten|energie|druck|gewicht|entfernung|zeit/i.test(key);
  const numeric=/[-+]?\d+(?:[.,]\d+)?\s*(?:%|°[CF]?|km|m|cm|mm|kg|g|t|l|ml|h|min|s|€|w|kwh)?/i.test(answer);
  const date=/\b(?:18|19|20)\d{2}\b/.test(answer)||/\b\d{1,2}\.\d{1,2}\.\d{2,4}\b/.test(answer);
- const concise=answer.length<=70,uniqueValue=!rows.some(row=>String(row||"").trim().toLocaleLowerCase("de")!==answer.toLocaleLowerCase("de")&&String(row||"").trim().length>0);
+ const concise=answer.length<=70,normalized=answer.toLocaleLowerCase("de"),uniqueValue=(rows||[]).filter(value=>String(value||"").trim().toLocaleLowerCase("de")===normalized).length<=1;
  return (important?5:0)+(numeric?3:0)+(date?3:0)+(concise?2:0)+(uniqueValue?1:0)-(answer.length>180?8:answer.length>110?3:0);
 }
 function makeVisualCards(visuals,setId,topicId,settings){
@@ -543,7 +543,7 @@ function makeVisualCards(visuals,setId,topicId,settings){
      const answer=String(cells[col]||"").trim(),header=headers[col];
      if(!rowTitle||!header||!answer||answer===rowTitle||answer.length>260)continue;
      const question="Was steht in der Tabelle bei „"+rowTitle+"“ unter „"+header+"“?",source="Tabellenzeile "+(r+1)+": "+cells.join(" | ")+".";
-     tableCandidates.push({question,answer,source,priority:scoreTableFact(rowTitle,header,answer,headers,cells)});
+     tableCandidates.push({question,answer,source,priority:scoreTableFact(rowTitle,header,answer,headers,table.rows.flat())});
     }
    }
   }
