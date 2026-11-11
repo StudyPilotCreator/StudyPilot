@@ -576,6 +576,27 @@ async function pdfText(file,getWorker,status,allowTopicList=false){
  if(pdf.numPages>limit)parts.push("[Nur die ersten "+limit+" von "+pdf.numPages+" Seiten wurden ausgelesen.]");
  return parts.join("\n");
 }
+function formatOcrLayout(data){
+ const lines=[];
+ for(const block of data&&Array.isArray(data.blocks)?data.blocks:[]){
+  for(const paragraph of block.paragraphs||[])for(const line of paragraph.lines||[]){
+   const text=String(line.text||"").replace(/\s+/g," ").trim(),box=line.bbox||{};
+   if(text&&Number.isFinite(Number(box.x0))&&Number.isFinite(Number(box.y0)))lines.push({text,x:Number(box.x0),y:Number(box.y0)});
+  }
+ }
+ if(lines.length<2)return String(data&&data.text||"").trim();
+ const heights=(data.blocks||[]).flatMap(b=>(b.paragraphs||[]).flatMap(p=>(p.lines||[]).map(l=>Math.max(1,Number(l.bbox&&l.bbox.y1)-Number(l.bbox&&l.bbox.y0)))))).sort((a,b)=>a-b);
+ const median=heights[Math.floor(heights.length/2)]||18;
+ lines.sort((a,b)=>a.y-b.y||a.x-b.x);
+ const rows=[];
+ for(const line of lines){
+  let row=rows.find(r=>Math.abs(r.y-line.y)<=Math.max(8,median*.7));
+  if(!row){row={y:line.y,items:[]};rows.push(row);}
+  row.items.push(line);row.y=row.items.reduce((sum,item)=>sum+item.y,0)/row.items.length;
+ }
+ rows.sort((a,b)=>a.y-b.y);
+ return rows.map(row=>row.items.sort((a,b)=>a.x-b.x).map(item=>item.text).join("  |  ")).join("\n").trim()||String(data&&data.text||"").trim();
+}
 function extractOcrLineBoxes(data,width,height){
  const result=[];
  for(const block of data&&Array.isArray(data.blocks)?data.blocks:[]){
@@ -774,7 +795,7 @@ function analyzeVisualStructure(canvas,ocrData,fileName){
  const arrowConnections=connections.filter(x=>x.directionKnown&&x.confidence>=.65);
  const tableQuality=tables.length?Math.max(...tables.map(t=>t.confidence)):0;
  const confidence=Math.min(.96,.28+(labels.length?Math.min(.24,labels.length*.015):0)+(lines.length?Math.min(.2,lines.length*.012):0)+(connections.length?Math.min(.16,connections.length*.04):0)+tableQuality*.2);
- return {
+ const output={
   fileName:String(fileName||"Bild").slice(0,255),kind:tables.length?"table-and-diagram":lines.length||components.length?"diagram":"text-with-layout",
   width:canvas.width,height:canvas.height,labels:labels.slice(0,80),lines:lines.slice(0,80).map(l=>({id:l.id,orientation:l.orientation,x1:l.x1/raster.w,y1:l.y1/raster.h,x2:l.x2/raster.w,y2:l.y2/raster.h,length:l.length/Math.max(raster.w,raster.h),arrowDirection:l.arrowDirection})),
   associations:associations.slice(0,80).map(a=>({...a,distance:a.distance/Math.max(raster.w,raster.h)})),
@@ -785,6 +806,8 @@ function analyzeVisualStructure(canvas,ocrData,fileName){
    arrowConnections.length?"Pfeilrichtungen wurden an Linienenden heuristisch erkannt.":"Die Richtung einer Verbindung ist nicht sicher erkennbar; die Reihenfolge ist geometrisch geschätzt."
   ].filter(Boolean)
  };
+ raster.canvas.width=1;raster.canvas.height=1;
+ return output;
 }
 function visualStructureEvidence(visuals){
  const parts=[];
@@ -870,16 +893,18 @@ async function recognizeImage(file,worker,status,allowTopicList=false){
    if(status)status("Foto analysieren: Durchlauf "+(i+1)+" von "+attempts.length+" ("+attempt.label+") …");
    try{await worker.setParameters({tessedit_pageseg_mode:attempt.psm,preserve_interword_spaces:"1"});}catch(e){}
    const result=await worker.recognize(attempt.image,{}, {blocks:true});
-   const data=result&&result.data||{},text=formatOcrLayout(data),confidence=Number(data.confidence)||0;
+   const data=result&&result.data||{},text=formatOcrLayout(data),confidence=Number(data.confidence)||0,ocrLines=extractOcrLineBoxes(data,canvas.width,canvas.height);
    if(!text)continue;
    const quality=textQuality(text,allowTopicList);
-   const score=(quality.ok?1000:0)+(Number(quality.score)||0)*.6+confidence*.4;
-   if(!best||score>best.score)best={text,confidence,quality,score,attempt:attempt.label};
+   const score=(quality.ok?1000:0)+(Number(quality.score)||0)*.6+confidence*.4+Math.min(30,ocrLines.length*.35);
+   if(!best||score>best.score)best={text,confidence,quality,score,attempt:attempt.label,data};
   }
   try{await worker.setParameters({tessedit_pageseg_mode:"6",preserve_interword_spaces:"1"});}catch(e){}
   if(!best)throw new Error("Kein lesbarer Text erkannt. Versuche ein schärferes Foto.");
   if(!best.quality.ok)throw new Error(best.quality.reason+" Probiere ein gerades, scharfes Foto mit weniger Schatten.");
-  return assertReadableOCR(best.text,best.confidence,allowTopicList);
+  const readable=assertReadableOCR(best.text,best.confidence,allowTopicList);
+  const visual=allowTopicList?null:analyzeVisualStructure(canvas,best.data,file.name);
+  return {text:readable,visual};
  }finally{
   if(canvas){canvas.width=1;canvas.height=1;}
   if(thresholdCanvas){thresholdCanvas.width=1;thresholdCanvas.height=1;}
@@ -894,7 +919,24 @@ async function readFile(file,getWorker,status,allowTopicList=false){
  if(file.type.startsWith("image/")||/\.(jpg|jpeg|png|webp|heic)$/i.test(name)){const w=await getWorker();status("Foto erkennen: "+file.name);return recognizeImage(file,w,status,allowTopicList);}
  throw new Error("Dateiformat nicht unterstützt: "+file.name);
 }
-async function readFiles(files,status,allowTopicList=false){let w=null;const getWorker=async()=>{if(!w)w=await createWorker();return w;},parts=[],names=[],errors=[];try{for(let i=0;i<files.length;i++){status("Datei "+(i+1)+" von "+files.length+": "+files[i].name);try{const txt=await readFile(files[i],getWorker,status,allowTopicList);if(txt.trim().length>3){if(!/\.pdf$/i.test(files[i].name)&&!/\.(jpe?g|png|webp|heic)$/i.test(files[i].name)&&!textQuality(txt,allowTopicList).ok)throw new Error("Der erkannte Text wirkt fehlerhaft. Bitte prüfe die Datei oder füge den Text direkt ein.");parts.push("\n\n--- "+files[i].name+" ---\n"+txt);names.push(files[i].name);}else errors.push(files[i].name+": kein lesbarer Text erkannt");}catch(e){errors.push(files[i].name+": "+e.message);}}}finally{if(w)try{await w.terminate();}catch(e){}}return {text:parts.join("\n").slice(0,120000),names,errors};}
+async function readFiles(files,status,allowTopicList=false){
+ let w=null;const getWorker=async()=>{if(!w)w=await createWorker();return w;},parts=[],names=[],errors=[],visuals=[];
+ try{
+  for(let i=0;i<files.length;i++){
+   status("Datei "+(i+1)+" von "+files.length+": "+files[i].name);
+   try{
+    const extracted=await readFile(files[i],getWorker,status,allowTopicList);
+    const txt=typeof extracted==="string"?extracted:String(extracted&&extracted.text||"");
+    if(txt.trim().length>3){
+     if(!/\.pdf$/i.test(files[i].name)&&!/\.(jpe?g|png|webp|heic)$/i.test(files[i].name)&&!textQuality(txt,allowTopicList).ok)throw new Error("Der erkannte Text wirkt fehlerhaft. Bitte prüfe die Datei oder füge den Text direkt ein.");
+     parts.push("\n\n--- "+files[i].name+" ---\n"+txt);names.push(files[i].name);
+     if(extracted&&extracted.visual&&Array.isArray(extracted.visual.labels))visuals.push(extracted.visual);
+    }else errors.push(files[i].name+": kein lesbarer Text erkannt");
+   }catch(e){errors.push(files[i].name+": "+e.message);}
+  }
+ }finally{if(w)try{await w.terminate();}catch(e){}}
+ return {text:parts.join("\n").slice(0,120000),names,errors,visuals};
+}
 function showFileList(){const el=$("file-list");if(el)el.innerHTML=pendingFiles.map((f,i)=>'<div class="file-chip"><span>'+(f.name.toLowerCase().endsWith(".pdf")?"📄":f.type.startsWith("image/")?"🖼️":"📝")+'</span><span style="flex:1;overflow-wrap:anywhere">'+esc(f.name)+' · '+Math.max(1,Math.round(f.size/1024))+' KB</span><button class="btn small" type="button" data-action="remove-file" data-index="'+i+'">Entfernen</button></div>').join("");}
 function openEditMaterial(id){
  const s=getSet(id);if(!s)return;
