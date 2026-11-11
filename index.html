@@ -122,11 +122,24 @@ const parseDate=s=>{const p=String(s||iso(new Date())).split("-").map(Number);re
 const today=new Date();today.setHours(0,0,0,0);const todayKey=iso(today);
 const subInfo=n=>SUBJECTS.find(s=>s.name===n)||{name:n,icon:"📘",color:"#36314f"};
 const baseData=()=>({profile:{setupDone:false,school:"Gymnasium",grade:8,difficulty:"Automatisch",subjects:["Deutsch","Mathematik","Englisch","Geschichte","Biologie"]},sets:[],reviews:{},quizStats:{},lastOpened:""});
+function normalizeVisualStructures(list){
+ return (Array.isArray(list)?list:[]).slice(0,8).map(v=>({
+  fileName:String(v.fileName||"Abbildung").slice(0,255),kind:String(v.kind||"image").slice(0,40),
+  width:Math.max(0,Number(v.width)||0),height:Math.max(0,Number(v.height)||0),
+  labels:(Array.isArray(v.labels)?v.labels:[]).filter(x=>x&&typeof x.text==="string").slice(0,80).map(x=>({text:x.text.slice(0,180),x:Math.max(0,Math.min(1,Number(x.x)||0)),y:Math.max(0,Math.min(1,Number(x.y)||0)),w:Math.max(0,Math.min(1,Number(x.w)||0)),h:Math.max(0,Math.min(1,Number(x.h)||0)),confidence:Math.max(0,Math.min(100,Number(x.confidence)||0))})),
+  lines:(Array.isArray(v.lines)?v.lines:[]).slice(0,80).map(x=>({id:String(x.id||"").slice(0,30),orientation:["vertical","shape"].includes(x.orientation)?x.orientation:"horizontal",x1:Math.max(0,Math.min(1,Number(x.x1)||0)),y1:Math.max(0,Math.min(1,Number(x.y1)||0)),x2:Math.max(0,Math.min(1,Number(x.x2)||0)),y2:Math.max(0,Math.min(1,Number(x.y2)||0)),length:Math.max(0,Math.min(1,Number(x.length)||0)),arrowDirection:["forward","backward"].includes(x.arrowDirection)?x.arrowDirection:"unknown"})),
+  associations:(Array.isArray(v.associations)?v.associations:[]).slice(0,80).map(x=>({label:String(x.label||"").slice(0,180),lineId:String(x.lineId||"").slice(0,30),kind:String(x.kind||"near-line").slice(0,30),distance:Math.max(0,Math.min(1,Number(x.distance)||0)),confidence:Math.max(0,Math.min(1,Number(x.confidence)||0))})),
+  connections:(Array.isArray(v.connections)?v.connections:[]).slice(0,40).map(x=>({from:String(x.from||"").slice(0,180),to:String(x.to||"").slice(0,180),kind:String(x.kind||"shared-line").slice(0,40),directionKnown:Boolean(x.directionKnown),confidence:Math.max(0,Math.min(1,Number(x.confidence)||0)),lineId:String(x.lineId||"").slice(0,30)})),
+  readingOrder:(Array.isArray(v.readingOrder)?v.readingOrder:[]).filter(x=>typeof x==="string").map(x=>x.slice(0,180)).slice(0,50),readingOrderBasis:String(v.readingOrderBasis||"Position").slice(0,80),
+  tables:(Array.isArray(v.tables)?v.tables:[]).slice(0,5).map(t=>({id:String(t.id||"table").slice(0,20),columns:Math.max(0,Number(t.columns)||0),confidence:Math.max(0,Math.min(1,Number(t.confidence)||0)),headerRow:Math.max(0,Number(t.headerRow)||0),rows:(Array.isArray(t.rows)?t.rows:[]).slice(0,25).map(row=>(Array.isArray(row)?row:[]).slice(0,12).map(cell=>String(cell||"").slice(0,300))),tableType:String(t.tableType||"grid").slice(0,30)})),
+  confidence:Math.max(0,Math.min(1,Number(v.confidence)||0)),notes:(Array.isArray(v.notes)?v.notes:[]).filter(x=>typeof x==="string").map(x=>x.slice(0,250)).slice(0,8)
+ }));
+}
 function normalizeData(raw){
  const base=baseData(),obj=raw&&typeof raw==="object"&&!Array.isArray(raw)?raw:{},p=obj.profile&&typeof obj.profile==="object"?obj.profile:{};
  const subjects=unique((Array.isArray(p.subjects)?p.subjects:base.profile.subjects).filter(x=>typeof x==="string").map(x=>x.trim()).filter(Boolean)).slice(0,30);
  const sets=(Array.isArray(obj.sets)?obj.sets:[]).filter(s=>s&&typeof s==="object"&&!Array.isArray(s)&&typeof s.title==="string"&&s.title.trim()).slice(0,200).map(s=>{
-  const sid=String(s.id||uid()),topics=(Array.isArray(s.topics)?s.topics:[]).filter(t=>t&&typeof t==="object"&&!Array.isArray(t)&&String(t.title||"").trim()).slice(0,30).map(t=>{
+  const sid=String(s.id||uid()),visuals=normalizeVisualStructures(s.visuals),topics=(Array.isArray(s.topics)?s.topics:[]).filter(t=>t&&typeof t==="object"&&!Array.isArray(t)&&String(t.title||"").trim()).slice(0,30).map(t=>{
    const tid=String(t.id||uid()),cards=(Array.isArray(t.cards)?t.cards:[]).filter(c=>c&&typeof c==="object"&&!Array.isArray(c)&&String(c.question||"").trim()&&String(c.answer||"").trim()).slice(0,100).map(c=>({id:String(c.id||uid()),question:String(c.question).slice(0,800),answer:String(c.answer).slice(0,1500),source:String(c.source||"").slice(0,2000)}));
    const questions=(Array.isArray(t.questions)?t.questions:[]).filter(q=>q&&typeof q==="object"&&!Array.isArray(q)&&String(q.prompt||"").trim()).slice(0,100).map(q=>{
     let options=unique((Array.isArray(q.options)?q.options:[]).filter(x=>typeof x==="string").map(x=>x.slice(0,500)));
@@ -134,9 +147,9 @@ function normalizeData(raw){
     let correctIndex=Number(q.correctIndex);if(!Number.isInteger(correctIndex)||correctIndex<0||correctIndex>=options.length)correctIndex=0;
     return {id:String(q.id||uid()),prompt:String(q.prompt).slice(0,1500),options:options.slice(0,6),correctIndex:Math.min(correctIndex,Math.min(options.length,6)-1),explanation:String(q.explanation||"").slice(0,2000),topicTitle:String(q.topicTitle||t.title).slice(0,100)};
    });
-   return {id:tid,title:String(t.title).trim().slice(0,120),summary:(Array.isArray(t.summary)?t.summary:[]).filter(x=>typeof x==="string").map(x=>x.slice(0,1500)).slice(0,12),cards,questions,sourceText:String(t.sourceText||"").slice(0,40000),matchMode:t.matchMode==="matched"?"matched":"general"};
+   return {id:tid,title:String(t.title).trim().slice(0,120),summary:(Array.isArray(t.summary)?t.summary:[]).filter(x=>typeof x==="string").map(x=>x.slice(0,1500)).slice(0,12),cards,questions,sourceText:String(t.sourceText||"").slice(0,40000),matchMode:["matched","unmatched"].includes(t.matchMode)?t.matchMode:"general"};
   });
-  return {id:sid,title:String(s.title).trim().slice(0,100),subject:String(s.subject||"Sonstiges").slice(0,80),exam:String(s.exam||"Lernset").slice(0,60),grade:Number.isInteger(Number(s.grade))&&Number(s.grade)>=1&&Number(s.grade)<=13?Number(s.grade):(Number.isInteger(Number(p.grade))&&Number(p.grade)>=1&&Number(p.grade)<=13?Number(p.grade):base.profile.grade),difficulty:["Automatisch","Einfach","Mittel","Anspruchsvoll"].includes(s.difficulty)?s.difficulty:(["Automatisch","Einfach","Mittel","Anspruchsvoll"].includes(p.difficulty)?p.difficulty:"Automatisch"),topicNames:(Array.isArray(s.topicNames)?s.topicNames:topics.map(t=>t.title)).filter(x=>typeof x==="string").map(x=>x.slice(0,120)).slice(0,12),content:String(s.content||"").slice(0,120000),documents:(Array.isArray(s.documents)?s.documents:[]).filter(x=>typeof x==="string").map(x=>x.slice(0,255)).slice(0,8),topics,createdAt:s.createdAt&&Number.isFinite(Date.parse(s.createdAt))?s.createdAt:new Date().toISOString()};
+  return {id:sid,title:String(s.title).trim().slice(0,100),subject:String(s.subject||"Sonstiges").slice(0,80),exam:String(s.exam||"Lernset").slice(0,60),grade:Number.isInteger(Number(s.grade))&&Number(s.grade)>=1&&Number(s.grade)<=13?Number(s.grade):(Number.isInteger(Number(p.grade))&&Number(p.grade)>=1&&Number(p.grade)<=13?Number(p.grade):base.profile.grade),difficulty:["Automatisch","Einfach","Mittel","Anspruchsvoll"].includes(s.difficulty)?s.difficulty:(["Automatisch","Einfach","Mittel","Anspruchsvoll"].includes(p.difficulty)?p.difficulty:"Automatisch"),topicNames:(Array.isArray(s.topicNames)?s.topicNames:topics.map(t=>t.title)).filter(x=>typeof x==="string").map(x=>x.slice(0,120)).slice(0,12),content:String(s.content||"").slice(0,120000),documents:(Array.isArray(s.documents)?s.documents:[]).filter(x=>typeof x==="string").map(x=>x.slice(0,255)).slice(0,8),visuals,topics,createdAt:s.createdAt&&Number.isFinite(Date.parse(s.createdAt))?s.createdAt:new Date().toISOString()};
  });
  const reviews={};if(obj.reviews&&typeof obj.reviews==="object"&&!Array.isArray(obj.reviews))for(const [id,r] of Object.entries(obj.reviews).slice(0,5000)){if(!r||typeof r!=="object")continue;reviews[String(id).slice(0,160)]={level:Math.min(4,Math.max(0,Number(r.level)||0)),dueAt:typeof r.dueAt==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(r.dueAt)?r.dueAt:todayKey,lastAt:typeof r.lastAt==="string"?r.lastAt:"",rating:r.rating==="known"?"known":"again"};}
  const quizStats={};if(obj.quizStats&&typeof obj.quizStats==="object"&&!Array.isArray(obj.quizStats))for(const [id,r] of Object.entries(obj.quizStats).slice(0,2000)){if(!r||typeof r!=="object")continue;quizStats[String(id).slice(0,160)]={played:Math.max(0,Number(r.played)||0),correct:Math.max(0,Number(r.correct)||0),total:Math.max(0,Number(r.total)||0),lastAt:typeof r.lastAt==="string"?r.lastAt:""};}
@@ -145,7 +158,7 @@ function normalizeData(raw){
 }
 let data;
 try{data=normalizeData(JSON.parse(localStorage.getItem(KEY)||"null"));}catch(e){data=baseData();}
-let view="home",subjectFilter="",setId="",topicId="",session=null,returnView="home",pendingFiles=[],pendingTopicFiles=[],processing=false,toastTimer=null,setupStep=0,searchQuery="";
+let view="home",subjectFilter="",setId="",topicId="",session=null,returnView="home",pendingFiles=[],pendingTopicFiles=[],preparedMaterial=null,processing=false,toastTimer=null,setupStep=0,searchQuery="";
 function save(){try{localStorage.setItem(KEY,JSON.stringify(data));return true;}catch(e){notify("Speicher voll. Exportiere ein Backup oder entferne ein Lernset.");return false;}}
 function notify(t){const e=$("toast");if(!e)return;e.textContent=t;e.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>e.classList.remove("show"),3000);}
 function gradeDifficulty(g){return g<=4?"Einfach":g<=7?"Einfach bis mittel":g<=9?"Mittel":g<=10?"Mittel bis anspruchsvoll":"Anspruchsvoll";}
@@ -191,14 +204,14 @@ function getTopic(s,id){return s&&s.topics.find(t=>String(t.id)===String(id));}
 function renderSet(){
  const s=getSet(setId);if(!s){view="library";return renderLibrary();}
  const hasMaterial=String(s.content||"").trim().length>=25,cards=s.topics.reduce((n,t)=>n+t.cards.length,0),questions=s.topics.reduce((n,t)=>n+t.questions.length,0),stats=data.quizStats[s.id]||{played:0};
- return '<section class="view"><button class="back-link" data-action="set-back">← '+esc(s.subject)+'</button><section class="hero glass"><div class="eyebrow">'+esc(s.subject)+' · '+esc(s.exam)+'</div><h1>'+esc(s.title)+'</h1><p>'+(hasMaterial?'Deine Inhalte sind in Themen sortiert. Lies den Überblick, übe Karteikarten und teste dein Wissen.':'Deine Themenübersicht ist gespeichert. Ergänze jetzt deine Lerninhalte, damit daraus Zusammenfassungen, Karteikarten und Quizfragen entstehen.')+'</p><div class="hero-actions">'+(hasMaterial?'<button class="btn primary" data-action="start-quiz" data-set-id="'+esc(s.id)+'">🎯 Komplettquiz starten</button><button class="btn" data-action="start-cards" data-set-id="'+esc(s.id)+'">🗂️ Alle Karteikarten</button>':'')+'<button class="btn mint" data-action="edit-material" data-id="'+esc(s.id)+'">'+(hasMaterial?'Material bearbeiten':'＋ Lernmaterial hinzufügen')+'</button><button class="btn danger" data-action="delete-set" data-id="'+esc(s.id)+'">Lernset löschen</button></div></section>'+(hasMaterial?'':'<section class="panel glass" style="margin:14px 0;border-color:#ffd48a55"><strong>✓ Themenliste gespeichert</strong><p class="small-text" style="line-height:1.7;margin:7px 0 0">Jetzt fehlt noch der eigentliche Lernstoff. Füge Schulbuchseiten, Arbeitsblätter oder Mitschriften hinzu. StudyPilot erfindet keine Antworten.</p></section>')+'<div class="stats"><div class="stat"><div class="stat-icon">🧩</div><div class="stat-number">'+s.topics.length+'</div><div class="stat-label">Themen</div></div><div class="stat"><div class="stat-icon">🗂️</div><div class="stat-number">'+cards+'</div><div class="stat-label">Karteikarten</div></div><div class="stat"><div class="stat-icon">🎯</div><div class="stat-number">'+stats.played+'</div><div class="stat-label">Quiz-Runden</div></div></div><div class="section-row"><h2>Themenübersicht</h2><span class="small-text">'+questions+' Quizfragen insgesamt</span></div><div class="topic-grid">'+s.topics.map(t=>'<article class="topic-card"><div class="topic-title">'+esc(t.title)+'</div><div class="topic-snippet">'+esc(t.summary.slice(0,2).join(" "))+'</div>'+(t.matchMode==="general"?'<div style="margin-top:8px"><span class="badge yellow">Material nicht eindeutig zugeordnet – bitte prüfen</span></div>':'')+'<div class="topic-actions"><button class="btn small" data-action="open-topic" data-topic-id="'+esc(t.id)+'">Überblick →</button><button class="btn small" data-action="topic-quiz" data-topic-id="'+esc(t.id)+'">Quiz</button></div></article>').join("")+'</div><section class="panel glass" style="margin-top:15px"><div class="panel-head"><h2>Materialien</h2><span class="badge">'+s.documents.length+' Dateien</span></div><div class="simple-list">'+(s.documents.map(d=>'<div class="simple-row"><div class="simple-row-icon">'+(d.toLowerCase().endsWith(".pdf")?"📄":d.match(/\.txt$/i)?"📝":"🖼️")+'</div><div class="simple-row-main"><div class="simple-row-title">'+esc(d)+'</div><div class="simple-row-meta">Ausgelesen und verarbeitet</div></div></div>').join("")||'<div class="small-text">Aus eingefügtem Text erstellt.</div>')+'</div><div class="form-note" style="margin-top:14px">Gespeichert werden der erkannte Text und deine Lernmaterialien, nicht die Originaldatei. Du kannst den Text jederzeit bearbeiten und neu aufbereiten.</div></section></section>';
+ return '<section class="view"><button class="back-link" data-action="set-back">← '+esc(s.subject)+'</button><section class="hero glass"><div class="eyebrow">'+esc(s.subject)+' · '+esc(s.exam)+'</div><h1>'+esc(s.title)+'</h1><p>'+(hasMaterial?'Deine Inhalte sind in Themen sortiert. Lies den Überblick, übe Karteikarten und teste dein Wissen.':'Deine Themenübersicht ist gespeichert. Ergänze jetzt deine Lerninhalte, damit daraus Zusammenfassungen, Karteikarten und Quizfragen entstehen.')+'</p><div class="hero-actions">'+(hasMaterial?'<button class="btn primary" data-action="start-quiz" data-set-id="'+esc(s.id)+'">🎯 Komplettquiz starten</button><button class="btn" data-action="start-cards" data-set-id="'+esc(s.id)+'">🗂️ Alle Karteikarten</button>':'')+'<button class="btn mint" data-action="edit-material" data-id="'+esc(s.id)+'">'+(hasMaterial?'Material bearbeiten':'＋ Lernmaterial hinzufügen')+'</button><button class="btn danger" data-action="delete-set" data-id="'+esc(s.id)+'">Lernset löschen</button></div></section>'+(hasMaterial?'':'<section class="panel glass" style="margin:14px 0;border-color:#ffd48a55"><strong>✓ Themenliste gespeichert</strong><p class="small-text" style="line-height:1.7;margin:7px 0 0">Jetzt fehlt noch der eigentliche Lernstoff. Füge Schulbuchseiten, Arbeitsblätter oder Mitschriften hinzu. StudyPilot erfindet keine Antworten.</p></section>')+'<div class="stats"><div class="stat"><div class="stat-icon">🧩</div><div class="stat-number">'+s.topics.length+'</div><div class="stat-label">Themen</div></div><div class="stat"><div class="stat-icon">🗂️</div><div class="stat-number">'+cards+'</div><div class="stat-label">Karteikarten</div></div><div class="stat"><div class="stat-icon">🎯</div><div class="stat-number">'+stats.played+'</div><div class="stat-label">Quiz-Runden</div></div></div><div class="section-row"><h2>Themenübersicht</h2><span class="small-text">'+questions+' Quizfragen insgesamt</span></div><div class="topic-grid">'+s.topics.map(t=>'<article class="topic-card"><div class="topic-title">'+esc(t.title)+'</div><div class="topic-snippet">'+esc(t.summary.slice(0,2).join(" "))+'</div>'+(t.matchMode==="general"||t.matchMode==="unmatched"?'<div style="margin-top:8px"><span class="badge yellow">'+(t.matchMode==="unmatched"?'Keine passenden Textstellen gefunden – Zuordnung prüfen':'Material nicht eindeutig zugeordnet – bitte prüfen')+'</span></div>':'')+'<div class="topic-actions"><button class="btn small" data-action="open-topic" data-topic-id="'+esc(t.id)+'">Überblick →</button><button class="btn small" data-action="topic-quiz" data-topic-id="'+esc(t.id)+'">Quiz</button></div></article>').join("")+'</div><section class="panel glass" style="margin-top:15px"><div class="panel-head"><h2>Materialien</h2><span class="badge">'+s.documents.length+' Dateien</span></div><div class="simple-list">'+(s.documents.map(d=>'<div class="simple-row"><div class="simple-row-icon">'+(d.toLowerCase().endsWith(".pdf")?"📄":d.match(/\.txt$/i)?"📝":"🖼️")+'</div><div class="simple-row-main"><div class="simple-row-title">'+esc(d)+'</div><div class="simple-row-meta">Ausgelesen und verarbeitet</div></div></div>').join("")||'<div class="small-text">Aus eingefügtem Text erstellt.</div>')+'</div><div class="form-note" style="margin-top:14px">Gespeichert werden der erkannte Text und deine Lernmaterialien, nicht die Originaldatei. Du kannst den Text jederzeit bearbeiten und neu aufbereiten.</div></section></section>';
 }
 function renderTopic(){
  const s=getSet(setId),t=getTopic(s,topicId);if(!s||!t){view="set";return renderSet();}
  const hasMaterial=String(t.sourceText||"").trim().length>=25;
  const overview=t.summary.length?'<ul class="bullets">'+t.summary.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul>':'<div class="empty">Noch kein Lernstoff zugeordnet. Füge im Lernset ein PDF, Foto oder Textmaterial hinzu.</div>';
  const facts=t.cards.length?'<div class="simple-list">'+t.cards.slice(0,6).map(c=>'<div class="simple-row"><div class="simple-row-icon">💡</div><div class="simple-row-main"><div class="simple-row-title">'+esc(c.question)+'</div><div class="simple-row-meta">'+esc(c.answer)+'</div></div></div>').join("")+'</div>':'<div class="empty">Karteikarten entstehen, sobald Lerninhalte hinzugefügt wurden.</div>';
- return '<section class="view"><button class="back-link" data-action="topic-back">← '+esc(s.title)+'</button><section class="hero glass"><div class="eyebrow">'+esc(s.subject)+' · THEMA</div><h1>'+esc(t.title)+'</h1><p>'+(hasMaterial?'Das Wichtigste in kurzen Punkten. Wenn du den Überblick verstanden hast, teste dich mit Karteikarten oder einem Quiz.':'Dieses Thema ist gespeichert, aber es wurde noch kein Lernstoff zugeordnet. Ergänze deine Unterlagen im Lernset.')+'</p><div class="hero-actions">'+(hasMaterial?'<button class="btn primary" data-action="topic-quiz" data-topic-id="'+esc(t.id)+'">🎯 Thema abfragen</button><button class="btn" data-action="topic-cards" data-topic-id="'+esc(t.id)+'">🗂️ Karteikarten</button>':'<button class="btn mint" data-action="edit-material" data-id="'+esc(s.id)+'">＋ Lernmaterial hinzufügen</button>')+'</div></section><section class="panel glass" style="margin-top:15px"><div class="panel-head"><h2>Kurzer Überblick</h2><span class="badge">'+t.summary.length+' Stichpunkte</span></div>'+overview+'</section><section class="panel glass" style="margin-top:14px"><div class="panel-head"><h2>Merke dir diese Fakten</h2></div>'+facts+'</section>'+(hasMaterial?'<p class="small-text" style="margin-top:13px">Automatisch aus deinen Materialien erstellt. Prüfe wichtige Daten und Definitionen mit deinen Unterrichtsunterlagen.</p>':'')+'</section>';
+ return '<section class="view"><button class="back-link" data-action="topic-back">← '+esc(s.title)+'</button><section class="hero glass"><div class="eyebrow">'+esc(s.subject)+' · THEMA</div><h1>'+esc(t.title)+'</h1><p>'+(hasMaterial?'Das Wichtigste in kurzen Punkten. Wenn du den Überblick verstanden hast, teste dich mit Karteikarten oder einem Quiz.':'Dieses Thema ist gespeichert, aber es wurde noch kein Lernstoff zugeordnet. Ergänze deine Unterlagen im Lernset.')+'</p><div class="hero-actions">'+(hasMaterial?'<button class="btn primary" data-action="topic-quiz" data-topic-id="'+esc(t.id)+'">🎯 Thema abfragen</button><button class="btn" data-action="topic-cards" data-topic-id="'+esc(t.id)+'">🗂️ Karteikarten</button>':'<button class="btn mint" data-action="edit-material" data-id="'+esc(s.id)+'">＋ Lernmaterial hinzufügen</button>')+'</div></section><section class="panel glass" style="margin-top:15px"><div class="panel-head"><h2>Kurzer Überblick</h2><span class="badge">'+t.summary.length+' Stichpunkte</span></div>'+overview+'</section><section class="panel glass" style="margin-top:14px"><div class="panel-head"><h2>Merke dir diese Fakten</h2></div>'+facts+'</section>'+(hasMaterial?'<p class="small-text" style="margin-top:13px">Automatisch aus deinen Materialien erstellt. Prüfe wichtige Daten und Definitionen mit deinen Unterrichtsunterlagen.</p>':'')+renderVisualAnalysis(getTopicVisuals(s,t))+'</section>';
 }
 
 function renderReview(){
@@ -230,10 +243,11 @@ function renderApp(){
 }
 function navButton(id,icon,label){return '<button class="nav-item '+(view===id||((id==="library")&&(view==="set"||view==="topic"))?"active":"")+'" data-action="nav" data-view="'+id+'"><span class="nav-icon">'+icon+'</span><span>'+label+'</span></button>';}
 function modal(content){$("modal-root").innerHTML='<div class="modal-backdrop" data-action="modal-backdrop"><section class="modal" role="dialog" aria-modal="true">'+content+'</section></div>';}
-function closeModal(){ $("modal-root").innerHTML="";pendingFiles=[];pendingTopicFiles=[];processing=false; }
+function closeModal(){ $("modal-root").innerHTML="";pendingFiles=[];pendingTopicFiles=[];preparedMaterial=null;processing=false; }
 function openNewSet(subject){
+ preparedMaterial=null;pendingFiles=[];pendingTopicFiles=[];
  const subjects=data.profile.subjects.length?data.profile.subjects:SUBJECTS.map(s=>s.name),chosen=subjects.includes(subject)?subject:subjects[0];
- modal('<h2>Neues Lernset erstellen</h2><p>Wähle Fach und Klassenarbeit, lade Themenliste und Inhalte hoch oder füge Text direkt ein. StudyPilot erstellt daraus Übersicht, Karteikarten und Quizfragen.</p><form id="new-set-form"><div class="form-grid"><div class="field"><label for="set-subject">Fach</label><select id="set-subject">'+subjects.map(s=>'<option '+(s===chosen?"selected":"")+'>'+esc(s)+'</option>').join("")+'</select></div><div class="field"><label for="set-exam">Wofür lernst du?</label><select id="set-exam">'+EXAMS.map(s=>'<option '+(s==="Klassenarbeit"?"selected":"")+'>'+esc(s)+'</option>').join("")+'</select></div><div class="field full"><label for="set-title">Name des Lernsets</label><input id="set-title" maxlength="100" required placeholder="z. B. Zweiter Weltkrieg – Klassenarbeit"></div><div class="field full"><label for="set-topics">Themen (optional, ein Thema pro Zeile)</label><textarea id="set-topics" placeholder="Zweiter Weltkrieg&#10;USA und Kriegseintritt&#10;Kriegsende in Europa"></textarea><small>Wenn du Themen vorgibst, ordnet die App Informationen diesen Stichwörtern zu.</small></div><div class="field full"><label>Themenliste als Datei (optional)</label><label for="set-topic-files" class="dropzone"><span style="font-size:27px">🗂️</span><strong>Themen-PDF oder Foto auswählen</strong><span>Foto deiner Themenübersicht oder PDF vom Lehrer · PDF, JPG, PNG, WEBP oder HEIC</span><input id="set-topic-files" type="file" accept=".pdf,image/jpeg,image/png,image/webp,image/heic" multiple hidden></label><div id="topic-file-list" class="file-list"></div><small>Die erkannten Themen werden zusätzlich zu deiner Texteingabe verwendet. Bitte kontrolliere sie nach dem Einlesen.</small></div><div class="field full"><label>Fotos oder PDFs mit Lerninhalten</label><label for="set-files" class="dropzone"><span style="font-size:27px">📄</span><strong>Material auswählen</strong><span>PDF, JPG, PNG, WEBP, HEIC oder TXT · max. 8 Dateien<br>20 MB je Datei · PDFs: erste 15 Seiten · OCR für Scans</span><input id="set-files" type="file" accept=".pdf,.txt,image/jpeg,image/png,image/webp,image/heic" multiple hidden></label><div id="file-list" class="file-list"></div></div><div class="field full"><label for="set-notes">Oder Text direkt einfügen</label><textarea id="set-notes" style="min-height:125px" placeholder="Kopiere hier deine Mitschrift, Themenliste oder bereits erkannten Text hinein …"></textarea></div></div><div id="create-status" class="small-text" style="margin-top:12px" aria-live="polite"></div><div id="create-loading" class="create-loading" aria-hidden="true"><div class="create-loading-head"><span id="create-progress-label">Vorbereitung</span><strong id="create-progress-percent">0%</strong></div><div class="create-progress-track" role="progressbar" aria-label="Lernmaterial wird erstellt" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="create-progress-fill"></span></div><div class="create-loading-note">Fotos und PDFs werden auf diesem Gerät verarbeitet.</div></div><div class="form-note" style="margin-top:12px">🔒 Deine Dateien werden im Browser ausgelesen und nicht an einen StudyPilot-Server hochgeladen. Die erste Foto-OCR benötigt Internet. Fragen entstehen derzeit durch lokale Textregeln statt ein großes KI-Modell — kontrolliere deshalb wichtige Fakten und die Themenzuordnung.</div><div class="form-actions"><button class="btn" type="button" data-action="modal-close">Abbrechen</button><button class="btn mint" id="create-button" type="submit">✨ Lernmaterial erstellen</button></div></form>');pendingFiles=[];
+ modal('<h2>Neues Lernset erstellen</h2><p>Wähle Fach und Klassenarbeit, lade Themenliste und Inhalte hoch oder füge Text direkt ein. Nach dem Auslesen kannst du den erkannten Text prüfen und korrigieren, bevor StudyPilot daraus Lernmaterial erstellt.</p><form id="new-set-form"><div class="form-grid"><div class="field"><label for="set-subject">Fach</label><select id="set-subject">'+subjects.map(s=>'<option '+(s===chosen?"selected":"")+'>'+esc(s)+'</option>').join("")+'</select></div><div class="field"><label for="set-exam">Wofür lernst du?</label><select id="set-exam">'+EXAMS.map(s=>'<option '+(s==="Klassenarbeit"?"selected":"")+'>'+esc(s)+'</option>').join("")+'</select></div><div class="field full"><label for="set-title">Name des Lernsets</label><input id="set-title" maxlength="100" required placeholder="z. B. Zweiter Weltkrieg – Klassenarbeit"></div><div class="field full"><label for="set-topics">Themen (optional, ein Thema pro Zeile)</label><textarea id="set-topics" placeholder="Zweiter Weltkrieg&#10;USA und Kriegseintritt&#10;Kriegsende in Europa"></textarea><small>Wenn du Themen vorgibst, ordnet die App Informationen diesen Stichwörtern zu.</small></div><div class="field full"><label>Themenliste als Datei (optional)</label><label for="set-topic-files" class="dropzone"><span style="font-size:27px">🗂️</span><strong>Themen-PDF oder Foto auswählen</strong><span>Foto deiner Themenübersicht oder PDF vom Lehrer · PDF, JPG, PNG, WEBP oder HEIC</span><input id="set-topic-files" type="file" accept=".pdf,image/jpeg,image/png,image/webp,image/heic" multiple hidden></label><div id="topic-file-list" class="file-list"></div><small>Die erkannten Themen werden zusätzlich zu deiner Texteingabe verwendet. Bitte kontrolliere sie nach dem Einlesen.</small></div><div class="field full"><label>Fotos oder PDFs mit Lerninhalten</label><label for="set-files" class="dropzone"><span style="font-size:27px">📄</span><strong>Material auswählen</strong><span>PDF, JPG, PNG, WEBP, HEIC oder TXT · max. 8 Dateien<br>20 MB je Datei · PDFs: erste 15 Seiten · OCR für Scans</span><input id="set-files" type="file" accept=".pdf,.txt,image/jpeg,image/png,image/webp,image/heic" multiple hidden></label><div id="file-list" class="file-list"></div></div><div class="field full"><label for="set-notes">Erkannter Text / eigene Notizen</label><textarea id="set-notes" style="min-height:145px" placeholder="Hier erscheint nach dem Auslesen der Text aus deinen Fotos und PDFs. Du kannst ihn vor der Erstellung korrigieren oder eigenen Text einfügen …"></textarea></div></div><div id="create-status" class="small-text" style="margin-top:12px" aria-live="polite"></div><div id="create-loading" class="create-loading" aria-hidden="true"><div class="create-loading-head"><span id="create-progress-label">Vorbereitung</span><strong id="create-progress-percent">0%</strong></div><div class="create-progress-track" role="progressbar" aria-label="Lernmaterial wird erstellt" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="create-progress-fill"></span></div><div class="create-loading-note">Fotos und PDFs werden auf diesem Gerät verarbeitet.</div></div><div class="form-note" style="margin-top:12px">🔒 Deine Dateien werden im Browser ausgelesen und nicht an einen StudyPilot-Server hochgeladen. Die erste Foto-OCR benötigt Internet. Fragen entstehen derzeit durch lokale Textregeln statt ein großes KI-Modell — kontrolliere deshalb wichtige Fakten und die Themenzuordnung.</div><div class="form-actions"><button class="btn" type="button" data-action="modal-close">Abbrechen</button><button class="btn mint" id="create-button" type="submit">✨ Lernmaterial erstellen</button></div></form>');pendingFiles=[];
 }
 function cleanSourceText(text){return String(text||"").normalize("NFC").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g," ").replace(/\uFFFD/g," ").replace(/\u00AD/g,"").replace(/([A-Za-zÄÖÜäöüß])-\s*\n\s*(?=[a-zäöüß])/g,"$1").replace(/\r/g,"\n").replace(/[ \t]+\n/g,"\n").replace(/\n{3,}/g,"\n\n").replace(/[ \t]{2,}/g," ").trim();}
 function splitSentences(text){
@@ -267,35 +281,52 @@ function parseTopicList(raw){
 function chooseTopics(text,title,input){const p=parseTopicList(input).slice(0,12);if(p.length)return p;const h=parseTopicList(text).filter(x=>(x.match(/\s+/g)||[]).length<=7).slice(0,8);return h.length>=2?h:[String(title||"Gesamtüberblick")];}
 function topicScore(sentence,topic){
  const s=String(sentence||"").toLocaleLowerCase("de"),t=String(topic||"").toLocaleLowerCase("de");
- const ignored=new Set(["und","oder","der","die","das","den","dem","des","ein","eine","einer","eines","einem","einen","mit","von","für","zum","zur","über","unter","the","and","aus","bei","wie","leben","regiert","regieren","thema","krieg","weltkrieg"]);
- const words=t.split(/[^a-zäöüß0-9]+/).filter(w=>w.length>=3&&!ignored.has(w));
+ if(!s||!t)return 0;
  const has=raw=>new RegExp("(^|[^a-zäöüß0-9])"+escRegex(String(raw).toLocaleLowerCase("de"))+"(?:e|en|er|es|em|ern|n|s)?([^a-zäöüß0-9]|$)","i").test(s);
- const wordMatches=words.reduce((n,w)=>n+(has(w)?1:0),0);
- let score=wordMatches;
- if(/weltkrieg/.test(t)&&has("weltkrieg"))score+=5;
- if(/zweiter weltkrieg/.test(t)&&/zweite[rn]? weltkrieg/.test(s))score+=2;
+ let score=s.includes(t)?5:0;
+ const ignored=new Set(["und","oder","der","die","das","den","dem","des","ein","eine","einer","eines","einem","einen","mit","von","für","zum","zur","über","unter","the","and","aus","bei","wie","im","in","am","an","auf","nach","vor","seit","durch","was","war","ist","sind","wurde","werden","lebte","leben"]);
+ const words=t.split(/[^a-zäöüß0-9]+/).filter(w=>w.length>=3&&!ignored.has(w));
+ for(const word of words)if(has(word))score+=2;
  const aliases=[
-  [/klosterleben|kloster|mönch|nonne|abt/,["kloster","klöster","mönch","nonne","abt","gebet","beteten","schreiben","handschrift"]],
-  [/könig|herrschaft|regier|mittelalterlicher herrscher/,["könig","könige","herrscher","reich","lehen","vasallen","vasall","treue","herrschaft","regierte","regierten","entscheidung"]],
+  [/zweiter weltkrieg|weltkrieg|kriegseintritt|kriegsende/,["polen","1939","1945","alliierten","hitler","ns-regime","pearl harbor","usa","sowjetunion","kapitulation","besetzung","invasion"]],
+  [/usa|vereinigte staaten|kriegseintritt|pearl harbor/,["usa","vereinigte staaten","pearl harbor","1941","japan","angriff","traten in den krieg"]],
+  [/klosterleben|kloster|mönch|nonne|abt/,["kloster","klöster","mönch","nonne","abt","gebet","handschrift","schreiben"]],
+  [/könig|herrschaft|regier|mittelalterlicher herrscher/,["könig","könige","herrscher","reich","lehen","vasallen","vasall","treue","herrschaft","regierte","regierten"]],
   [/ständegesellschaft|stände|gesellschaft/,["stand","stände","adel","klerus","bauer","bauern","geistliche","freie","unfreie"]],
-  [/ritter|burg|burgen/,["ritter","burg","burgen","burggraben","lehen","vasall","ritter"]],
-  [/leben auf dem land|bauer|landwirtschaft/,["bauer","bauern","feld","felder","grundherr","abgaben","abgabe","ernte","land","acker"]],
-  [/weltkrieg|krieg/,["deutschland","polen","alliierten","kapitulation","kriegsende","überfall","invasion","besetzung","besetzten","besatzung","front","endete","niederlage","sieg"]],
-  [/beginn|ausbruch|start/,["begann","beginnt","ausbruch","überfall","invasion","ausgelöst"]],
-  [/kriegseintritt|usa|vereinigte staaten|pearl harbor/,["usa","vereinigte staaten","pearl harbor","traten","trat","angriff","kriegseintritt"]],
-  [/ende|kapitulation|kriegsende|niederlage/,["endete","kapitulation","beendete","sieg","niederlage"]],
-  [/ursach|grund|auslöser/,["ursache","ursachen","grund","auslöser","aufgrund","deshalb","führte zu"]],
-  [/folgen|auswirkung|konsequenz/,["folge","folgen","auswirkung","wiederaufbau","verlust","veränderung"]],
+  [/ritter|burg|burgen/,["ritter","burg","burgen","burggraben","lehen","vasall"]],
+  [/leben auf dem land|bauer|landwirtschaft/,["bauer","bauern","feld","felder","grundherr","abgaben","abgabe","ernte","acker"]],
+  [/ursach|grund|auslöser/,["ursache","ursachen","grund","auslöser","aufgrund","deshalb","führte zu","verursachte"]],
+  [/folgen|auswirkung|konsequenz/,["folge","folgen","auswirkung","wiederaufbau","verlust","veränderung","führte zu"]],
   [/fried|vertrag|abkommen/,["frieden","vertrag","abkommen","unterzeichnet","gründeten"]]
  ];
- for(const [pattern,aliasTerms] of aliases){if(pattern.test(t))score+=aliasTerms.reduce((n,w)=>n+(has(w)?2:0),0);}
+ for(const [pattern,wordsForTopic] of aliases)if(pattern.test(t)){
+  for(const word of wordsForTopic)if(has(word))score+=2;
+ }
  return score;
 }
-function bestFacts(text,topic){
- const sentences=splitSentences(text),matching=topic?sentences.filter(s=>topicScore(s,topic)>0):sentences;
- const a=matching.length?matching:sentences;
- const rank=a.map((s,i)=>({s,i,score:(/\b(19\d{2}|20\d{2})\b/.test(s)?3:0)+(/\b(weil|deshalb|dadurch|folglich|daher|führte|verursachte|bedeutet|ist|war)\b/i.test(s)?2:0)+(s.length>60&&s.length<260?2:0)})).sort((x,y)=>y.score-x.score||x.i-y.i);
- return rank.length?rank.slice(0,6).map(x=>x.s):String(text||"").trim()?[String(text).trim().slice(0,280)]:[];
+function bestFacts(text,topic,limit=6){
+ const sentences=unique(splitSentences(text)).filter(s=>s.length>=22&&s.length<=420&&(s.match(/\S+/g)||[]).length>=3);
+ const matching=topic?sentences.filter(s=>topicScore(s,topic)>0):sentences;
+ if(topic&&!matching.length)return [];
+ const ranked=matching.map((s,i)=>{
+  const words=s.match(/\S+/g)||[];
+  const years=(s.match(/\b(?:18|19|20)\d{2}\b/g)||[]).length;
+  const score=(years?4:0)+(/\b(ist|sind|bedeutet|bezeichnet|heißt)\b/i.test(s)?3:0)+(/\b(weil|deshalb|dadurch|folglich|daher|führte zu|verursachte|infolge)\b/i.test(s)?3:0)+(/\b(wichtig|insbesondere|vor allem|zum beispiel)\b/i.test(s)?1:0)+(s.length>=55&&s.length<=260?2:0)+(words.length>=8&&words.length<=35?1:0)+(/[.!?]$/.test(s)?1:0);
+  return {s,i,score};
+ }).sort((a,b)=>b.score-a.score||a.i-b.i);
+ const chosen=[],signatures=[];
+ for(const item of ranked){
+  const tokens=new Set(item.s.toLocaleLowerCase("de").replace(/[^\p{L}\p{N}\s]/gu," ").split(/\s+/).filter(w=>w.length>2));
+  const tooSimilar=signatures.some(other=>{
+   let overlap=0;for(const token of tokens)if(other.has(token))overlap++;
+   const union=tokens.size+other.size-overlap;
+   return union>0&&overlap/union>0.78;
+  });
+  if(tooSimilar)continue;
+  chosen.push(item);signatures.push(tokens);
+  if(chosen.length>=Math.max(1,limit))break;
+ }
+ return chosen.sort((a,b)=>a.i-b.i).map(x=>x.s);
 }
 function levelSettings(grade,difficulty){
  const g=Number(grade)||8,mode=difficulty&&difficulty!=="Automatisch"?difficulty:(g<=4?"Einfach":g<=9?"Mittel":"Anspruchsvoll");
@@ -350,19 +381,45 @@ function extractFactQuestion(sentence){
  }
  return null;
 }
-function makeCards(text,title,set,tId,settings){
- const facts=unique(bestFacts(text,title).map(cleanSourceText).filter(s=>s.length>=24)),out=[];
- facts.forEach((s,i)=>{
-  const year=s.match(/\b(1[89]\d{2}|20\d{2})\b/),def=parseDefinition(s),fact=extractFactQuestion(s);
-  let q=settings.grade<=5?"Was ist wichtig zum Thema „"+title+"“?":"Was sagt das Material über „"+title+"“?",a=s;
-  if(year){q="Welche Jahreszahl nennt das Material für diese Aussage?\n"+s.replace(year[0],"_____");a=year[0];}
-  else if(def){q="Was versteht man unter „"+def.term+"“?";a=def.definition.replace(/[.!?]+$/,"");}
-  else if(fact){q=fact.prompt;a=fact.answer;}
-  else if(i>0)q="Nenne einen weiteren wichtigen Fakt zum Thema „"+title+"“.";
-  out.push({id:set+"-"+tId+"-c"+i,question:q,answer:a,source:s});
+function findClozeTarget(sentence,title){
+ const titleWords=new Set(String(title||"").toLocaleLowerCase("de").split(/[^a-zäöüß0-9]+/).filter(w=>w.length>2));
+ const ignored=new Set(["der","die","das","den","dem","des","ein","eine","einer","eines","einem","einen","und","oder","aber","dann","dort","hier","diese","dieser","dieses","the","a","an"]);
+ const candidates=terms(sentence).map(raw=>String(raw).replace(/^(?:der|die|das|den|dem|des|ein|eine|einer|eines|einem|einen|the|a|an)\s+/i,"").trim()).filter(candidate=>{
+  const words=candidate.split(/\s+/);
+  const key=candidate.toLocaleLowerCase("de");
+  return candidate.length>=3&&candidate.length<=55&&words.length<=4&&!ignored.has(key)&&!words.every(w=>titleWords.has(w.toLocaleLowerCase("de")))&&sentence.toLocaleLowerCase("de").indexOf(key)>0;
  });
- if(!out.length&&String(text||"").trim())out.push({id:set+"-"+tId+"-c0",question:"Was weißt du über „"+title+"“?",answer:cleanSourceText(text).slice(0,500),source:cleanSourceText(text).slice(0,500)});
- return out.slice(0,settings.cardLimit);
+ candidates.sort((a,b)=>(b.split(/\s+/).length*12+b.length)-(a.split(/\s+/).length*12+a.length));
+ return candidates[0]||"";
+}
+function extractCauseQuestion(sentence){
+ let m=sentence.match(/^(.{6,140}?)\s+(führte zu|verursachte|löste aus|hatte zur Folge)\s+(.{5,160})$/i);
+ if(m)return {prompt:"Welche Folge hatte "+m[1].trim()+"?",answer:m[3].replace(/[.!?]+$/,""),source:sentence};
+ m=sentence.match(/^(.{6,140}?)\s+(war der Grund für|war der Auslöser für)\s+(.{5,160})$/i);
+ if(m)return {prompt:"Was war laut Material der Grund für "+m[3].replace(/[.!?]+$/,"")+"?",answer:m[1].trim(),source:sentence};
+ return null;
+}
+function makeCards(text,title,set,tId,settings){
+ const facts=unique(bestFacts(text,title,Math.max(settings.cardLimit*2,12)).map(cleanSourceText).filter(s=>s.length>=22)),out=[],used=new Set();
+ for(const s of facts){
+  if(out.length>=settings.cardLimit)break;
+  const year=s.match(/\b(1[89]\d{2}|20\d{2})\b/),def=parseDefinition(s),cause=extractCauseQuestion(s),fact=extractFactQuestion(s);
+  let question="",answer="";
+  if(year){question="Ergänze die fehlende Jahreszahl:\n"+s.replace(year[0],"_____");answer=year[0];}
+  else if(def){question="Was bedeutet „"+def.term+"“?";answer=def.definition.replace(/[.!?]+$/,"");}
+  else if(cause){question=cause.prompt;answer=cause.answer;}
+  else if(fact&&fact.type!=="when"){question=fact.prompt;answer=fact.answer;}
+  else{
+   const target=findClozeTarget(s,title);
+   if(target){question="Ergänze den fehlenden Begriff:\n"+s.replace(new RegExp(escRegex(target),"i"),"_____");answer=target;}
+  }
+  if(!question||!answer||answer.length>260)continue;
+  const key=question.toLocaleLowerCase("de").replace(/\s+/g," ").trim();
+  if(used.has(key))continue;
+  used.add(key);
+  out.push({id:set+"-"+tId+"-c"+out.length,question,answer,source:s});
+ }
+ return out;
 }
 function makeFalseStatement(sentence,termList,allYears){
  const years=allYears||[],year=sentence.match(/\b(?:18|19|20)\d{2}\b/);
@@ -396,58 +453,150 @@ function makeFalseStatement(sentence,termList,allYears){
 }
 
 function makeQuiz(text,title,set,tId,settings){
- const source=cleanSourceText(text),years=unique((source.match(/\b(?:18|19|20)\d{2}\b/g)||[])),limit=settings.quizLimit,out=[],usedSentences=new Set();
- const sentencePool=unique(splitSentences(source)).filter(s=>s.length>=24&&s.length<=340&&(s.match(/\S+/g)||[]).length>=5),matching=sentencePool.filter(s=>topicScore(s,title)>0);
- const facts=(matching.length?matching:sentencePool).slice(0,Math.max(limit*2,20));
+ const source=cleanSourceText(text),years=unique((source.match(/\b(?:18|19|20)\d{2}\b/g)||[])),limit=settings.quizLimit,out=[],used=new Set();
+ const facts=bestFacts(source,title,Math.max(limit*3,18));
  for(const s of facts){
   if(out.length>=limit)break;
-  const year=s.match(/\b(?:18|19|20)\d{2}\b/);if(!year)continue;
-  const n=Number(year[0]),pool=unique(years.filter(x=>x!==year[0]).concat([n-1,n+1,n+2,n+5].map(String))).filter(x=>x!==year[0]);
-  const opts=optionsFor(year[0],pool);
-  if(opts.length<2)continue;
-  out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Welche Jahreszahl gehört in die Lücke?\n"+s.replace(year[0],"_____"),options:opts,correctIndex:opts.indexOf(year[0]),explanation:"Im Material steht: "+s,topicTitle:title});
-  usedSentences.add(s);
+  const year=s.match(/\b(?:18|19|20)\d{2}\b/);if(!year||used.has(s))continue;
+  const n=Number(year[0]),pool=unique(years.filter(x=>x!==year[0]).concat([n-1,n+1,n+2,n+5,n-5].map(String))).filter(x=>x!==year[0]);
+  const opts=optionsFor(year[0],pool);if(opts.length<2)continue;
+  out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Welche Jahreszahl passt zur Aussage?\n"+s.replace(year[0],"_____"),options:opts,correctIndex:opts.indexOf(year[0]),explanation:"Im Material steht: "+s,topicTitle:title,source:s});
+  used.add(s);
  }
  const definitions=unique(facts.map(s=>({source:s,definition:parseDefinition(s)})).filter(x=>x.definition).map(x=>({...x,key:x.definition.term.toLocaleLowerCase("de")})).filter((x,i,a)=>a.findIndex(y=>y.key===x.key)===i));
- if(definitions.length>=2){
-  for(const item of definitions){
-   if(out.length>=limit)break;
-   const otherTerms=definitions.filter(d=>d.key!==item.key).map(d=>d.definition.term),opts=optionsFor(item.definition.term,otherTerms);
-   if(opts.length<2)continue;
-   out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Welcher Begriff passt zu dieser Beschreibung?\n"+item.definition.definition,options:opts,correctIndex:opts.indexOf(item.definition.term),explanation:"Im Material wird „"+item.definition.term+"“ so beschrieben: "+item.definition.definition,topicTitle:title});
-   usedSentences.add(item.source);
-  }
+ for(const item of definitions){
+  if(out.length>=limit)break;
+  const otherTerms=definitions.filter(d=>d.key!==item.key).map(d=>d.definition.term),opts=optionsFor(item.definition.term,otherTerms);
+  if(opts.length<2)continue;
+  out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Welcher Begriff passt zu dieser Beschreibung?\n"+item.definition.definition,options:opts,correctIndex:opts.indexOf(item.definition.term),explanation:"Im Material wird „"+item.definition.term+"“ so beschrieben: "+item.definition.definition,topicTitle:title,source:item.source});
+  used.add(item.source);
  }
  const factQuestions=facts.map(s=>extractFactQuestion(s)).filter(Boolean);
  for(const item of factQuestions){
   if(out.length>=limit)break;
-  if(usedSentences.has(item.source))continue;
+  if(used.has(item.source))continue;
   const pool=factQuestions.filter(other=>other.type===item.type&&other.source!==item.source).map(other=>other.answer);
-  const opts=optionsFor(item.answer,pool);
-  if(opts.length<2)continue;
-  out.push({id:set+"-"+tId+"-q"+out.length,prompt:item.prompt,options:opts,correctIndex:opts.indexOf(item.answer),explanation:"Im Material steht: "+item.source,topicTitle:title});
-  usedSentences.add(item.source);
+  const opts=optionsFor(item.answer,pool);if(opts.length<2)continue;
+  out.push({id:set+"-"+tId+"-q"+out.length,prompt:item.prompt,options:opts,correctIndex:opts.indexOf(item.answer),explanation:"Im Material steht: "+item.source,topicTitle:title,source:item.source});
+  used.add(item.source);
  }
- let candidateIndex=0;
  for(const s of facts){
   if(out.length>=limit)break;
-  if(usedSentences.has(s))continue;
-  const falseText=makeFalseStatement(s,[],years);if(!falseText)continue;
-  const useFalse=candidateIndex%2===0,statement=useFalse?falseText:s;
-  out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Prüfe die Aussage anhand deiner Unterlagen.\n"+statement,options:["Richtig","Falsch"],correctIndex:useFalse?1:0,explanation:useFalse?"Im Material steht stattdessen: "+s:"Diese Aussage wurde direkt aus dem Material übernommen: "+s,topicTitle:title});
-  candidateIndex++;usedSentences.add(s);
+  if(used.has(s))continue;
+  const match=s.match(/\b(1[89]\d{2}|20\d{2})\b/);if(!match)continue;
+  const n=Number(match[0]),wrong=[n+1,n-1,n+2,n-2,n+5].map(String).find(x=>!years.includes(x)&&x!==match[0]);
+  if(!wrong)continue;
+  const statement=s.replace(match[0],wrong);
+  out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Ist diese Aussage laut Material richtig oder falsch?\n"+statement,options:["Richtig","Falsch"],correctIndex:1,explanation:"Im Material steht stattdessen: "+s,topicTitle:title,source:s});
+  used.add(s);
  }
  return out.slice(0,limit);
 }
-function makeSet(input){
- const source=cleanSourceText(input.text),id=uid(),names=chooseTopics(source,input.title,input.topicInput),sentences=splitSentences(source),settings=levelSettings(input.grade,input.difficulty);
- const topics=names.map((title,i)=>{
-  const matching=sentences.filter(s=>topicScore(s,title)>0),useMatched=matching.length>0;
-  let content=useMatched?matching.join(" "):source;
-  if(!content)content=source;
-  return {id:uid(),title,summary:bestFacts(content,title).slice(0,settings.summaryLimit),cards:makeCards(content,title,id,"t"+i,settings),questions:makeQuiz(content,title,id,"t"+i,settings),sourceText:content,matchMode:useMatched?"matched":"general"};
+function validateGeneratedCards(cards,sourceText){
+ const source=cleanSourceText(sourceText).toLocaleLowerCase("de");
+ return (cards||[]).filter(card=>{
+  const evidence=cleanSourceText(card.source||"").toLocaleLowerCase("de");
+  const answer=cleanSourceText(card.answer||"").toLocaleLowerCase("de");
+  return evidence.length>=18&&source.includes(evidence)&&answer.length>0&&evidence.includes(answer)&&String(card.question||"").trim().length>=8&&String(card.question||"").length<=360;
  });
- return {id,title:input.title,subject:input.subject,exam:input.exam,grade:settings.grade,difficulty:settings.level,topicNames:names,content:source.slice(0,120000),documents:input.documents||[],topics,createdAt:new Date().toISOString()};
+}
+function validateGeneratedQuiz(questions,sourceText){
+ const source=cleanSourceText(sourceText).toLocaleLowerCase("de");
+ return (questions||[]).filter(question=>{
+  const evidence=cleanSourceText(question.source||"").toLocaleLowerCase("de");
+  const options=Array.isArray(question.options)?question.options.map(x=>String(x||"").trim()):[];
+  const distinct=new Set(options.map(x=>x.toLocaleLowerCase("de")));
+  return evidence.length>=18&&source.includes(evidence)&&options.length>=2&&options.length<=4&&distinct.size===options.length&&Number.isInteger(question.correctIndex)&&question.correctIndex>=0&&question.correctIndex<options.length&&options[question.correctIndex].length>0&&String(question.prompt||"").trim().length>=8;
+ });
+}
+function visualText(visual){
+ const labels=(visual&&visual.labels||[]).map(x=>x.text).join(" "),cells=(visual&&visual.tables||[]).flatMap(t=>t.rows||[]).flat().join(" ");
+ return (labels+" "+cells).trim();
+}
+function visualsForTopic(visuals,title,multiTopic=false){return (visuals||[]).filter(visual=>!multiTopic||topicScore(visualText(visual),title)>0);}
+function visualEvidenceForCards(visuals){
+ const parts=[];
+ for(const visual of visuals||[]){
+  for(const association of visual.associations||[]){const line=(visual.lines||[]).find(x=>x.id===association.lineId);if(line)parts.push(line.orientation==="shape"?"Die Beschriftung „"+association.label+"“ liegt nahe an einer gezeichneten Linie oder Kurve.":"Die Beschriftung „"+association.label+"“ liegt nahe an einer "+(line.orientation==="horizontal"?"waagerechten":"senkrechten")+" Linie.");}
+  for(const c of visual.connections||[])parts.push("Verbundene Elemente: "+c.from+" ↔ "+c.to+". Die Abbildung verbindet „"+c.from+"“ mit „"+c.to+"“"+(c.directionKnown?" durch eine gerichtete Linie.":" durch eine gemeinsame Linie oder Zeichnungsform."));
+  if(visual.readingOrder&&visual.readingOrder.length>=2)parts.push("Geschätzte Leserichtung der Abbildung: "+visual.readingOrder.join(" → ")+".");
+  for(const t of visual.tables||[])for(let r=0;r<t.rows.length;r++)if(t.rows[r].some(Boolean))parts.push("Tabellenzeile "+(r+1)+": "+t.rows[r].join(" | ")+".");
+ }
+ return parts.join("\n");
+}
+function scoreTableFact(rowTitle,header,answer,headers,rows){
+ const key=(String(header||"")+" "+String(rowTitle||"")).toLocaleLowerCase("de");
+ const important=/jahr|datum|temperatur|niederschlag|höhe|tiefe|länge|breite|fläche|einwohner|anteil|prozent|menge|wert|ergebnis|ursache|folge|funktion|merkmal|hauptstadt|bevölkerung|geschwindigkeit|dauer|kosten|energie|druck|gewicht|entfernung|zeit/i.test(key);
+ const numeric=/[-+]?\d+(?:[.,]\d+)?\s*(?:%|°[CF]?|km|m|cm|mm|kg|g|t|l|ml|h|min|s|€|w|kwh)?/i.test(answer);
+ const date=/\b(?:18|19|20)\d{2}\b/.test(answer)||/\b\d{1,2}\.\d{1,2}\.\d{2,4}\b/.test(answer);
+ const concise=answer.length<=70,normalized=answer.toLocaleLowerCase("de"),uniqueValue=(rows||[]).filter(value=>String(value||"").trim().toLocaleLowerCase("de")===normalized).length<=1;
+ return (important?5:0)+(numeric?3:0)+(date?3:0)+(concise?2:0)+(uniqueValue?1:0)-(answer.length>180?8:answer.length>110?3:0);
+}
+function makeVisualCards(visuals,setId,topicId,settings){
+ const out=[],used=new Set(),limit=Math.min(12,Math.max(4,Math.ceil(settings.cardLimit*.5))),tableCandidates=[];
+ for(const visual of visuals||[]){
+  for(const table of visual.tables||[]){
+   const headers=(table.rows[table.headerRow||0]||[]).map(x=>String(x||"").trim());
+   for(let r=(table.headerRow||0)+1;r<table.rows.length;r++){
+    const cells=table.rows[r]||[],rowTitle=String(cells[0]||"").trim();
+    for(let col=1;col<Math.min(cells.length,headers.length);col++){
+     const answer=String(cells[col]||"").trim(),header=headers[col];
+     if(!rowTitle||!header||!answer||answer===rowTitle||answer.length>260)continue;
+     const question="Was steht in der Tabelle bei „"+rowTitle+"“ unter „"+header+"“?",source="Tabellenzeile "+(r+1)+": "+cells.join(" | ")+".";
+     tableCandidates.push({question,answer,source,priority:scoreTableFact(rowTitle,header,answer,headers,table.rows.flat())});
+    }
+   }
+  }
+ }
+ tableCandidates.sort((a,b)=>b.priority-a.priority);
+ for(const candidate of tableCandidates){
+  if(out.length>=limit)break;
+  const key=candidate.question.toLocaleLowerCase("de");if(used.has(key))continue;used.add(key);
+  out.push({id:setId+"-"+topicId+"-v"+out.length,question:candidate.question,answer:candidate.answer,source:candidate.source});
+ }
+ for(const visual of visuals||[]){
+  for(const association of visual.associations||[]){
+   if(out.length>=limit)break;const line=(visual.lines||[]).find(x=>x.id===association.lineId);if(!line||association.confidence<.48)continue;
+   const shape=line.orientation==="shape",direction=line.orientation==="horizontal"?"waagerechten":"senkrechten";
+   const area=shape?"":(line.orientation==="horizontal"?(line.y1<.33?" im oberen":line.y1>.66?" im unteren":" im mittleren"):(line.x1<.33?" im linken":line.x1>.66?" im rechten":" im mittleren"));
+   const question=shape?"Welche Beschriftung liegt nahe an einer gezeichneten Linie oder Kurve?":"Welche Beschriftung liegt nahe an der "+direction+" Linie"+area+" Bildbereich?";
+   const answer=association.label,source=shape?"Die Beschriftung „"+association.label+"“ liegt nahe an einer gezeichneten Linie oder Kurve.":"Die Beschriftung „"+association.label+"“ liegt nahe an einer "+direction+" Linie.";
+   if(used.has(question))continue;used.add(question);out.push({id:setId+"-"+topicId+"-v"+out.length,question,answer,source});
+  }
+  for(const relation of visual.connections||[]){
+   if(out.length>=limit)break;if(relation.confidence<.5)continue;
+   const question="Welche Elemente sind in der Abbildung miteinander verbunden?",answer=relation.from+" ↔ "+relation.to,source="Verbundene Elemente: "+relation.from+" ↔ "+relation.to+". Die Abbildung verbindet „"+relation.from+"“ mit „"+relation.to+"“"+(relation.directionKnown?" durch eine gerichtete Linie.":" durch eine gemeinsame Linie oder Zeichnungsform.");
+   if(used.has(answer.toLocaleLowerCase("de")))continue;used.add(answer.toLocaleLowerCase("de"));out.push({id:setId+"-"+topicId+"-v"+out.length,question,answer,source});
+  }
+  if(out.length<limit&&visual.readingOrder&&visual.readingOrder.length>=2){
+   const answer=visual.readingOrder.slice(0,12).join(" → "),question=String(visual.readingOrderBasis||"").includes("Pfeil")?"Welche Reihenfolge ergibt sich aus den Pfeilrichtungen?":"Wie ist die räumliche Leserichtung in der Abbildung?",source="Geschätzte Leserichtung der Abbildung: "+answer+".";
+   if(!used.has(question)){used.add(question);out.push({id:setId+"-"+topicId+"-v"+out.length,question,answer,source});}
+  }
+ }
+ return out;
+}
+function getTopicVisuals(set,topic){return visualsForTopic(set&&set.visuals,topic&&topic.title,(set&&set.topicNames||[]).length>1);}
+function renderVisualAnalysis(visuals){
+ if(!visuals||!visuals.length)return "";
+ return '<section class="panel glass" style="margin-top:14px"><div class="panel-head"><h2>Abbildungen und Tabellen</h2><span class="small-text">'+visuals.length+' analysiert</span></div>'+visuals.map(visual=>{
+  const labels=(visual.labels||[]).map(x=>x.text),associations=(visual.associations||[]).map(a=>{const line=(visual.lines||[]).find(x=>x.id===a.lineId),descriptor=line?(line.orientation==="shape"?"gezeichneten Linie oder Kurve":line.orientation==="horizontal"?"waagerechten Linie":"senkrechten Linie"):"";return line?'<div class="simple-row"><div class="simple-row-icon">↔</div><div class="simple-row-main"><div class="simple-row-title">'+esc(a.label)+'</div><div class="simple-row-meta">Nahe an einer '+descriptor+' · '+Math.round((a.confidence||0)*100)+'% Zuordnungssicherheit</div></div></div>':"";}).join("");
+  const connections=(visual.connections||[]).map(c=>'<div class="simple-row"><div class="simple-row-icon">'+(c.directionKnown?"➜":"↔")+'</div><div class="simple-row-main"><div class="simple-row-title">'+esc(c.from)+(c.directionKnown?" → ":" ↔ ")+esc(c.to)+'</div><div class="simple-row-meta">'+(c.directionKnown?"Pfeilrichtung geschätzt":"Gemeinsame Linie oder Zeichnungsform · Richtung nicht sicher")+'</div></div></div>').join("");
+  const tables=(visual.tables||[]).map(table=>'<div style="overflow:auto;margin-top:9px"><table style="width:100%;border-collapse:collapse;font-size:11px"><tbody>'+table.rows.map((row,i)=>'<tr>'+row.map(cell=>'<'+(i===0?"th":"td")+' style="border:1px solid var(--line);padding:8px;text-align:left">'+esc(cell||"")+'</'+(i===0?"th":"td")+'>').join("")+'</tr>').join("")+'</tbody></table></div>').join("");
+  const order=(visual.readingOrder||[]).length?'<div class="form-note" style="margin-top:10px"><strong>'+esc(visual.readingOrderBasis||"Geschätzte Leserichtung")+'</strong> '+visual.readingOrder.map(esc).join(" → ")+'</div>':"";
+  return '<div style="padding:13px 0;border-top:1px solid var(--line)"><div style="display:flex;justify-content:space-between;gap:10px"><strong>'+esc(visual.fileName||"Abbildung")+'</strong><span class="small-text">Analyse: '+Math.round((visual.confidence||0)*100)+'%</span></div>'+(labels.length?'<div class="small-text" style="margin-top:10px">Erkannte Beschriftungen</div><div class="chips" style="margin-top:7px">'+labels.map(x=>'<span class="chip">'+esc(x)+'</span>').join("")+'</div>':"")+(associations?'<div class="small-text" style="margin-top:12px">Beschriftung und Linie</div><div class="simple-list" style="margin-top:6px">'+associations+'</div>':"")+(connections?'<div class="small-text" style="margin-top:12px">Erkannte Verbindungen</div><div class="simple-list" style="margin-top:6px">'+connections+'</div>':"")+order+tables+'<p class="small-text" style="line-height:1.6;margin:10px 0 0">Automatische geometrische Schätzung. Prüfe besonders Linienzuordnung und Pfeilrichtung anhand des Originals.</p></div>';
+ }).join("")+'</section>';
+}
+function makeSet(input){
+ const diagrams=Array.isArray(input.visuals)?input.visuals:[],id=uid(),names=chooseTopics(input.text,input.title,input.topicInput),sentences=splitSentences(input.text),settings=levelSettings(input.grade,input.difficulty),multiTopic=names.length>1;
+ const topics=names.map((title,i)=>{
+  const matching=sentences.filter(s=>topicScore(s,title)>0),hasMatch=matching.length>0,content=hasMatch?matching.join(" "):(multiTopic?"":cleanSourceText(input.text));
+  const topicVisuals=visualsForTopic(diagrams,title,multiTopic),verificationText=cleanSourceText(content+"\n"+visualEvidenceForCards(topicVisuals));
+  const summary=content?bestFacts(content,title,settings.summaryLimit):[];
+  const draftCards=makeCards(content,title,id,"t"+i,settings).concat(makeVisualCards(topicVisuals,id,"t"+i,settings)),draftQuestions=makeQuiz(content,title,id,"t"+i,settings);
+  const cards=validateGeneratedCards(draftCards,verificationText),questions=validateGeneratedQuiz(draftQuestions,content);
+  return {id:uid(),title,summary,cards,questions,sourceText:content,matchMode:hasMatch?"matched":(multiTopic?"unmatched":"general"),quality:{cardsChecked:draftCards.length,questionsChecked:draftQuestions.length,cardsAccepted:cards.length,questionsAccepted:questions.length}};
+ });
+ return {id,title:input.title,subject:input.subject,exam:input.exam,grade:settings.grade,difficulty:settings.level,topicNames:names,content:cleanSourceText(input.text).slice(0,120000),visuals:diagrams.slice(0,8),documents:input.documents||[],topics,createdAt:new Date().toISOString()};
 }
 function loadScript(src,test){return new Promise((resolve,reject)=>{if(test()){resolve();return;}const x=document.createElement("script");x.src=src;x.async=true;x.onload=()=>test()?resolve():reject(new Error("Bibliothek nicht verfügbar."));x.onerror=()=>reject(new Error("Bibliothek konnte nicht geladen werden. Prüfe deine Internetverbindung."));document.head.appendChild(x);});}
 async function ensurePdf(){await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js",()=>!!window.pdfjsLib);pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";}
@@ -458,7 +607,7 @@ async function createWorker(){
  return worker;
 }
 function textQuality(text,allowTopicList=false){
- const s=String(text||"").replace(/\s+/g," ").trim(),words=s.match(/[A-Za-zÄÖÜäöüß0-9]+/g)||[];
+ const s=String(text||"").replace(/\s*\|\s*/g," ").replace(/\s+/g," ").trim(),words=s.match(/[A-Za-zÄÖÜäöüß0-9]+/g)||[];
  if(allowTopicList){
   const topics=parseTopicList(text),topicWords=topics.join(" ").match(/[A-Za-zÄÖÜäöüß0-9]+/g)||[];
   const letters=(s.match(/[A-Za-zÄÖÜäöüß]/g)||[]).length,vowels=(s.match(/[aeiouyäöü]/gi)||[]).length;
@@ -481,13 +630,43 @@ function textQuality(text,allowTopicList=false){
  return {ok,score:Math.round(score),reason:"Die Texterkennung ist unsicher ("+Math.round(score)+"% Textqualität). Bitte ein schärferes, geraderes Foto verwenden."};
 }
 function assertReadableOCR(text,confidence,allowTopicList=false){
- const q=textQuality(text,allowTopicList),minimum=allowTopicList?25:42;
- if((Number.isFinite(confidence)&&confidence<minimum)||!q.ok)throw new Error(q.reason+" StudyPilot hat das Material vorsichtshalber nicht übernommen.");
+ const q=textQuality(text,allowTopicList),minimum=allowTopicList?22:30;
+ if((Number.isFinite(confidence)&&confidence>0&&confidence<minimum)||!q.ok)throw new Error(q.reason+" StudyPilot hat das Material vorsichtshalber nicht übernommen.");
  return String(text).trim();
+}
+function pdfTextItemsToOcrData(items,viewport){
+ const words=[];
+ for(const item of items||[]){
+  const text=String(item.str||"").replace(/\s+/g," ").trim(),transform=item.transform||[];
+  if(!text||transform.length<6)continue;
+  const point=viewport.convertToViewportPoint(Number(transform[4])||0,Number(transform[5])||0);
+  const width=Math.max(5,Math.abs(Number(item.width)||8)*viewport.scale),height=Math.max(7,Math.abs(Number(item.height)||Math.abs(Number(transform[3])||9))*viewport.scale);
+  const x0=Math.max(0,Math.min(viewport.width,point[0])),y1=Math.max(0,Math.min(viewport.height,point[1])),x1=Math.max(x0,Math.min(viewport.width,x0+width)),y0=Math.max(0,Math.min(viewport.height,y1-height));
+  if(x1<=x0||y1<=y0)continue;
+  words.push({text,x0,y0,x1,y1,confidence:100});
+ }
+ if(!words.length)return {text:"",blocks:[],words:[]};
+ const heights=words.map(x=>x.y1-x.y0).sort((a,b)=>a-b),median=heights[Math.floor(heights.length/2)]||12,tolerance=Math.max(5,median*.72),rows=[];
+ for(const word of words.sort((a,b)=>a.y0-b.y0||a.x0-b.x0)){
+  const cy=(word.y0+word.y1)/2;
+  let row=rows.find(x=>Math.abs(x.y-cy)<=tolerance);
+  if(!row){row={y:cy,items:[]};rows.push(row);}
+  row.items.push(word);row.y=row.items.reduce((sum,x)=>sum+(x.y0+x.y1)/2,0)/row.items.length;
+ }
+ rows.sort((a,b)=>a.y-b.y);
+ const lines=rows.map(row=>{
+  const sorted=row.items.sort((a,b)=>a.x0-b.x0),box={x0:Math.min(...sorted.map(x=>x.x0)),y0:Math.min(...sorted.map(x=>x.y0)),x1:Math.max(...sorted.map(x=>x.x1)),y1:Math.max(...sorted.map(x=>x.y1))};
+  return {text:sorted.map(x=>x.text).join(" "),bbox:box,confidence:100};
+ });
+ return {text:lines.map(x=>x.text).join("\n"),blocks:[{paragraphs:[{lines}]}],words:words.map(x=>({text:x.text,bbox:{x0:x.x0,y0:x.y0,x1:x.x1,y1:x.y1},confidence:100})),confidence:100};
+}
+function visualStructureScore(visual){
+ if(!visual)return -1;
+ return (visual.labels||[]).length+(visual.associations||[]).length*.4+(visual.connections||[]).length*2+(visual.tables||[]).length*6;
 }
 async function pdfText(file,getWorker,status,allowTopicList=false){
  await ensurePdf();
- const pdf=await pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise,parts=[],limit=Math.min(pdf.numPages,15);
+ const pdf=await pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise,parts=[],visuals=[],limit=Math.min(pdf.numPages,15);
  for(let n=1;n<=limit;n++){
   status("PDF lesen: Seite "+n+" von "+limit);
   const page=await pdf.getPage(n),tc=await page.getTextContent();
@@ -498,27 +677,417 @@ async function pdfText(file,getWorker,status,allowTopicList=false){
    currentLine+=(currentLine?" ":"")+str;if(Number.isFinite(y))lastY=y;
   }
   if(currentLine.trim())lines.push(currentLine.trim());
-  let txt=lines.join("\n").trim(),quality=textQuality(txt,allowTopicList);
-  if(!quality.ok){
-   status("PDF-Seite "+n+": Texterkennung verbessern …");
-   let canvas=null;
-   try{
-    const w=await getWorker(),v=page.getViewport({scale:2});
-    canvas=document.createElement("canvas");canvas.width=Math.round(v.width);canvas.height=Math.round(v.height);
-    const ctx=canvas.getContext("2d",{willReadFrequently:true});await page.render({canvasContext:ctx,viewport:v}).promise;
-    const result=await w.recognize(canvas),ocr=String(result.data&&result.data.text||"").trim(),oq=textQuality(ocr,allowTopicList);
-    if(oq.ok&&(!quality.ok||oq.score>quality.score))txt=ocr;
-   }catch(e){}
-   finally{if(canvas){canvas.width=1;canvas.height=1;}}
-  }
+  let txt=lines.join("\n").trim(),quality=textQuality(txt,allowTopicList),canvas=null,pageVisual=null;
+  try{
+   if(!allowTopicList){
+    status("PDF-Seite "+n+": Abbildungen und Tabellen analysieren …");
+    const base=page.getViewport({scale:1}),scale=Math.min(1.8,1800/Math.max(base.width,base.height)),viewport=page.getViewport({scale});
+    canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(viewport.width));canvas.height=Math.max(1,Math.round(viewport.height));
+    const ctx=canvas.getContext("2d",{willReadFrequently:true});
+    await page.render({canvasContext:ctx,viewport}).promise;
+    const layoutData=pdfTextItemsToOcrData(tc.items,viewport);
+    if(layoutData.blocks.length&&layoutData.blocks[0].paragraphs[0].lines.length)pageVisual=analyzeVisualStructure(canvas,layoutData,file.name+" · Seite "+n);
+   }
+   if(!quality.ok){
+    status("PDF-Seite "+n+": Texterkennung verbessern …");
+    if(!canvas){
+     const viewport=page.getViewport({scale:Math.min(1.8,1800/Math.max(page.getViewport({scale:1}).width,page.getViewport({scale:1}).height))});
+     canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(viewport.width));canvas.height=Math.max(1,Math.round(viewport.height));
+     await page.render({canvasContext:canvas.getContext("2d",{willReadFrequently:true}),viewport}).promise;
+    }
+    const worker=await getWorker(),result=await worker.recognize(canvas,{}, {blocks:true}),ocr=String(result.data&&result.data.text||"").trim(),ocrQuality=textQuality(ocr,allowTopicList);
+    if(ocrQuality.ok&&(!quality.ok||ocrQuality.score>quality.score)){
+     txt=ocr;quality=ocrQuality;
+     if(!allowTopicList){
+      const ocrVisual=analyzeVisualStructure(canvas,result.data,file.name+" · Seite "+n);
+      if(visualStructureScore(ocrVisual)>visualStructureScore(pageVisual))pageVisual=ocrVisual;
+     }
+    }
+   }
+  }catch(error){
+   if(!quality.ok)throw error;
+  }finally{if(canvas){canvas.width=1;canvas.height=1;}}
   if(!textQuality(txt,allowTopicList).ok)throw new Error("PDF-Seite "+n+" konnte nicht zuverlässig gelesen werden. Bitte exportiere diese Seite als scharfes Foto oder füge den Text direkt ein.");
   if(txt)parts.push("Seite "+n+":\n"+txt);
+  if(pageVisual&&(pageVisual.labels.length||pageVisual.tables.length||pageVisual.connections.length||pageVisual.associations.length))visuals.push(pageVisual);
  }
  if(pdf.numPages>limit)parts.push("[Nur die ersten "+limit+" von "+pdf.numPages+" Seiten wurden ausgelesen.]");
+ return {text:parts.join("\n"),visuals};
+}
+function formatOcrLayout(data){
+ const lines=[],heights=[];
+ for(const block of data&&Array.isArray(data.blocks)?data.blocks:[]){
+  for(const paragraph of block.paragraphs||[])for(const line of paragraph.lines||[]){
+   const text=String(line.text||"").replace(/\s+/g," ").trim(),box=line.bbox||{};
+   if(text&&Number.isFinite(Number(box.x0))&&Number.isFinite(Number(box.y0)))lines.push({text,x:Number(box.x0),y:Number(box.y0)});
+   heights.push(Math.max(1,Number(box.y1)-Number(box.y0)));
+  }
+ }
+ if(lines.length<2)return String(data&&data.text||"").trim();
+ heights.sort((a,b)=>a-b);
+ const median=heights[Math.floor(heights.length/2)]||18;
+ lines.sort((a,b)=>a.y-b.y||a.x-b.x);
+ const rows=[];
+ for(const line of lines){
+  let row=rows.find(r=>Math.abs(r.y-line.y)<=Math.max(8,median*.7));
+  if(!row){row={y:line.y,items:[]};rows.push(row);}
+  row.items.push(line);row.y=row.items.reduce((sum,item)=>sum+item.y,0)/row.items.length;
+ }
+ rows.sort((a,b)=>a.y-b.y);
+ return rows.map(row=>row.items.sort((a,b)=>a.x-b.x).map(item=>item.text).join("  |  ")).join("\n").trim()||String(data&&data.text||"").trim();
+}
+function extractOcrLineBoxes(data,width,height){
+ const result=[];
+ for(const block of data&&Array.isArray(data.blocks)?data.blocks:[]){
+  for(const paragraph of block.paragraphs||[]){
+   for(const line of paragraph.lines||[]){
+    const text=String(line.text||"").replace(/\s+/g," ").trim(),box=line.bbox||{};
+    const x0=Number(box.x0),x1=Number(box.x1),y0=Number(box.y0),y1=Number(box.y1);
+    if(!text||![x0,x1,y0,y1].every(Number.isFinite)||x1<=x0||y1<=y0)continue;
+    result.push({text,x:x0/width,y:y0/height,w:(x1-x0)/width,h:(y1-y0)/height,confidence:Number(line.confidence)||0});
+   }
+  }
+ }
+ return result.sort((a,b)=>a.y-b.y||a.x-b.x).slice(0,160);
+}
+function extractOcrWordBoxes(data,width,height,lines){
+ const words=[];
+ for(const word of Array.isArray(data&&data.words)?data.words:[]){
+  const text=String(word.text||"").trim(),box=word.bbox||{},x0=Number(box.x0),x1=Number(box.x1),y0=Number(box.y0),y1=Number(box.y1);
+  if(!text||![x0,x1,y0,y1].every(Number.isFinite)||x1<=x0||y1<=y0)continue;
+  words.push({text,x:x0/width,y:y0/height,w:(x1-x0)/width,h:(y1-y0)/height,confidence:Number(word.confidence)||0});
+ }
+ return words.length?words:lines;
+}
+function buildVisualMask(canvas,labels,wordBoxes){
+ const exclusions=wordBoxes&&wordBoxes.length?wordBoxes:labels;
+ const maxWidth=920,scale=Math.min(1,maxWidth/canvas.width),w=Math.max(1,Math.round(canvas.width*scale)),h=Math.max(1,Math.round(canvas.height*scale));
+ const work=document.createElement("canvas");work.width=w;work.height=h;
+ const ctx=work.getContext("2d",{willReadFrequently:true});if(!ctx)throw new Error("Visuelle Analyse nicht verfügbar.");
+ ctx.drawImage(canvas,0,0,w,h);
+ const pixels=ctx.getImageData(0,0,w,h).data,mask=new Uint8Array(w*h);
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+  const i=(y*w+x)*4,l=.299*pixels[i]+.587*pixels[i+1]+.114*pixels[i+2];
+  if(l<128)mask[y*w+x]=1;
+ }
+ // Remove OCR text regions so handwriting is not mistaken for diagram edges.
+ for(const label of exclusions){
+  const x0=Math.max(0,Math.floor(label.x*w)-3),x1=Math.min(w,Math.ceil((label.x+label.w)*w)+3);
+  const y0=Math.max(0,Math.floor(label.y*h)-3),y1=Math.min(h,Math.ceil((label.y+label.h)*h)+3);
+  for(let y=y0;y<y1;y++)mask.fill(0,y*w+x0,y*w+x1);
+ }
+ return {mask,w,h,scale,canvas:work};
+}
+function mergeAxisCandidates(candidates,orientation){
+ const sorted=candidates.slice().sort((a,b)=>a.pos-b.pos),groups=[];
+ for(const item of sorted){
+  let group=groups.find(g=>Math.abs(g.pos-item.pos)<=2.5&&Math.min(g.end,item.end)>=Math.max(g.start,item.start)-8);
+  if(!group){group={pos:item.pos,start:item.start,end:item.end,weight:1,thickness:1};groups.push(group);}
+  else{group.pos=(group.pos*group.weight+item.pos)/(group.weight+1);group.weight++;group.start=Math.min(group.start,item.start);group.end=Math.max(group.end,item.end);group.thickness++;}
+ }
+ return groups.map((g,index)=>orientation==="h"?{id:"h"+index,x1:g.start,y1:g.pos,x2:g.end,y2:g.pos,length:g.end-g.start,orientation:"horizontal"}:{id:"v"+index,x1:g.pos,y1:g.start,x2:g.pos,y2:g.end,length:g.end-g.start,orientation:"vertical"}).filter(s=>s.length>=24);
+}
+function detectAxisSegments(mask,w,h){
+ const horizontal=[],vertical=[],gap=7,minH=Math.max(42,w*.075),minV=Math.max(42,h*.075);
+ for(let y=0;y<h;y++){
+  let start=-1,last=-1;
+  for(let x=0;x<=w;x++){
+   const dark=x<w&&mask[y*w+x]===1;
+   if(dark){if(start<0)start=x;last=x;}
+   else if(start>=0&&(x-last<=gap+1||x===w)){
+    if(last-start+1>=minH)horizontal.push({pos:y,start,end:last});
+    if(x-last>gap+1){start=-1;last=-1;}
+   }else if(start>=0){start=-1;last=-1;}
+  }
+ }
+ for(let x=0;x<w;x++){
+  let start=-1,last=-1;
+  for(let y=0;y<=h;y++){
+   const dark=y<h&&mask[y*w+x]===1;
+   if(dark){if(start<0)start=y;last=y;}
+   else if(start>=0&&(y-last<=gap+1||y===h)){
+    if(last-start+1>=minV)vertical.push({pos:x,start,end:last});
+    if(y-last>gap+1){start=-1;last=-1;}
+   }else if(start>=0){start=-1;last=-1;}
+  }
+ }
+ return mergeAxisCandidates(horizontal,"h").concat(mergeAxisCandidates(vertical,"v"));
+}
+function detectInkComponents(mask,w,h){
+ const visited=mask,queue=new Int32Array(mask.length),components=[];
+ for(let seed=0;seed<visited.length&&components.length<100;seed++){
+  if(visited[seed]!==1)continue;
+  let head=0,tail=0,minX=w,minY=h,maxX=0,maxY=0,sumX=0,sumY=0,samples=[],count=0;
+  queue[tail++]=seed;visited[seed]=0;
+  while(head<tail){
+   const idx=queue[head++],x=idx%w,y=(idx/w)|0;count++;
+   if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;
+   sumX+=x;sumY+=y;
+   if(count%Math.max(1,Math.floor(tail/240))===0&&samples.length<400)samples.push({x,y});
+   for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+    if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=w||ny>=h)continue;
+    const next=ny*w+nx;if(visited[next]===1){visited[next]=0;queue[tail++]=next;}
+   }
+  }
+  const bw=maxX-minX+1,bh=maxY-minY+1;
+  if(count<20||Math.max(bw,bh)<12)continue;
+  if(!samples.length)samples.push({x:sumX/count,y:sumY/count});
+  components.push({id:"shape"+components.length,x:minX,y:minY,w:bw,h:bh,cx:sumX/count,cy:sumY/count,count,aspect:Math.max(bw,bh)/Math.max(1,Math.min(bw,bh)),samples});
+ }
+ return components;
+}
+function pointSegmentDistance(px,py,line){
+ const dx=line.x2-line.x1,dy=line.y2-line.y1,len2=dx*dx+dy*dy;
+ if(!len2)return Math.hypot(px-line.x1,py-line.y1);
+ const t=Math.max(0,Math.min(1,((px-line.x1)*dx+(py-line.y1)*dy)/len2));
+ return Math.hypot(px-(line.x1+t*dx),py-(line.y1+t*dy));
+}
+function rectPointDistance(px,py,label){
+ const x0=label.x,y0=label.y,x1=x0+label.w,y1=y0+label.h;
+ const dx=px<x0?x0-px:px>x1?px-x1:0,dy=py<y0?y0-py:py>y1?py-y1:0;
+ return Math.hypot(dx,dy);
+}
+function sampleDark(mask,w,h,x,y){
+ let hits=0;
+ for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+  const xx=Math.round(x)+dx,yy=Math.round(y)+dy;
+  if(xx>=0&&yy>=0&&xx<w&&yy<h&&mask[yy*w+xx])hits++;
+ }
+ return hits;
+}
+function arrowAtEndpoint(mask,w,h,line,atStart){
+ const dx=line.x2-line.x1,dy=line.y2-line.y1,len=Math.hypot(dx,dy)||1,ux=dx/len,uy=dy/len;
+ const tx=atStart?line.x1:line.x2,ty=atStart?line.y1:line.y2,back=atStart?1:-1,px=-uy,py=ux;
+ let score=0;
+ for(let d=5;d<=19;d+=2){
+  const a=sampleDark(mask,w,h,tx+back*ux*d+px*d,ty+back*uy*d+py*d);
+  const b=sampleDark(mask,w,h,tx+back*ux*d-px*d,ty+back*uy*d-py*d);
+  score=Math.max(score,Math.min(a,b));
+ }
+ return score;
+}
+function detectTableGrid(lines,wordBoxes,w,h){
+ const hs=lines.filter(l=>l.orientation==="horizontal"&&l.length>=w*.2).sort((a,b)=>a.y1-b.y1);
+ const vs=lines.filter(l=>l.orientation==="vertical"&&l.length>=h*.16).sort((a,b)=>a.x1-b.x1);
+ if(hs.length<3||vs.length<2)return [];
+ // Regular notebook ruling can look like a table grid. Do not interpret a dense,
+ // page-spanning, evenly spaced background grid as a real table.
+ const spacingVariation=items=>{
+  const gaps=items.slice(1).map((item,i)=>item-items[i]).filter(x=>x>0);
+  if(gaps.length<4)return 1;
+  const mean=gaps.reduce((sum,x)=>sum+x,0)/gaps.length;
+  return mean?Math.sqrt(gaps.reduce((sum,x)=>sum+(x-mean)*(x-mean),0)/gaps.length)/mean:1;
+ };
+ const hPositions=hs.map(x=>x.y1),vPositions=vs.map(x=>x.x1);
+ const hCoverage=hs.map(x=>x.length).sort((a,b)=>a-b)[Math.floor(hs.length*.75)]||0;
+ const vCoverage=vs.map(x=>x.length).sort((a,b)=>a-b)[Math.floor(vs.length*.75)]||0;
+ if(hs.length>=10&&vs.length>=10&&hCoverage>=w*.82&&vCoverage>=h*.82&&spacingVariation(hPositions)<.16&&spacingVariation(vPositions)<.16)return [];
+ const intersections=[];
+ for(const hLine of hs)for(const vLine of vs){
+  if(vLine.x1>=Math.min(hLine.x1,hLine.x2)-10&&vLine.x1<=Math.max(hLine.x1,hLine.x2)+10&&hLine.y1>=Math.min(vLine.y1,vLine.y2)-10&&hLine.y1<=Math.max(vLine.y1,vLine.y2)+10)intersections.push([hLine.id,vLine.id]);
+ }
+ if(intersections.length<hs.length*vs.length*.62||intersections.length<6)return [];
+ const ys=hs.map(x=>x.y1).sort((a,b)=>a-b),xs=vs.map(x=>x.x1).sort((a,b)=>a-b),grid=Array.from({length:ys.length-1},()=>Array.from({length:xs.length-1},()=>[]));
+ for(const word of wordBoxes){
+  const cx=(word.x+word.w/2)*w,cy=(word.y+word.h/2)*h;
+  const row=ys.findIndex((v,i)=>i<ys.length-1&&cy>=v&&cy<ys[i+1]),col=xs.findIndex((v,i)=>i<xs.length-1&&cx>=v&&cx<xs[i+1]);
+  if(row>=0&&col>=0)grid[row][col].push(word);
+ }
+ const rows=grid.map(row=>row.map(cell=>cell.sort((a,b)=>a.x-b.x).map(x=>x.text).join(" ").trim()));
+ const occupied=rows.flat().filter(Boolean).length;
+ return occupied? [{id:"table0",rows,columns:xs.length-1,confidence:Math.min(.96,.55+intersections.length/(hs.length*vs.length)*.35),headerRow:0}]:[];
+}
+function detectWhitespaceTable(wordBoxes,w,h){
+ const words=(wordBoxes||[]).filter(x=>String(x.text||"").trim()&&x.w>0&&x.h>0);
+ if(words.length<6)return [];
+ const heights=words.map(x=>x.h*h).sort((a,b)=>a-b),median=heights[Math.floor(heights.length/2)]||15,tolerance=Math.max(7,median*.75);
+ const rows=[];
+ for(const word of words.slice().sort((a,b)=>a.y-b.y||a.x-b.x)){
+  const cy=(word.y+word.h/2)*h;
+  let row=rows.find(r=>Math.abs(r.y-cy)<=tolerance);
+  if(!row){row={y:cy,items:[]};rows.push(row);}
+  row.items.push(word);row.y=row.items.reduce((sum,x)=>sum+(x.y+x.h/2)*h,0)/row.items.length;
+ }
+ const usable=rows.filter(r=>r.items.length>=2).sort((a,b)=>a.y-b.y);
+ if(usable.length<3)return [];
+ const gaps=[];
+ usable.forEach((row,rowIndex)=>{
+  const items=row.items.slice().sort((a,b)=>a.x-b.x);
+  for(let i=0;i<items.length-1;i++){
+   const left=items[i],right=items[i+1],gap=(right.x-(left.x+left.w))*w;
+   if(gap>=Math.max(22,w*.022))gaps.push({cut:(left.x+left.w+right.x)/2*w,rowIndex,gap});
+  }
+ });
+ const clusters=[];
+ for(const gap of gaps){
+  let group=clusters.find(x=>Math.abs(x.cut-gap.cut)<=Math.max(18,w*.025));
+  if(!group){group={cut:gap.cut,count:0,rows:new Set(),weight:0};clusters.push(group);}
+  group.cut=(group.cut*group.weight+gap.cut)/(group.weight+1);group.weight++;group.count++;group.rows.add(gap.rowIndex);
+ }
+ const cuts=clusters.filter(x=>x.rows.size>=Math.max(3,Math.ceil(usable.length*.55))).sort((a,b)=>a.cut-b.cut);
+ if(!cuts.length)return [];
+ const bounds=[0,...cuts.map(x=>x.cut/w),1],grid=usable.map(row=>Array.from({length:bounds.length-1},()=>[]));
+ usable.forEach((row,r)=>{
+  for(const word of row.items){
+   const cx=word.x+word.w/2,col=bounds.findIndex((v,i)=>i<bounds.length-1&&cx>=v&&cx<bounds[i+1]);
+   if(col>=0)grid[r][col].push(word);
+  }
+ });
+ const data=grid.map(row=>row.map(cell=>cell.sort((a,b)=>a.x-b.x).map(x=>x.text).join(" ").trim()));
+ const nonEmptyRows=data.filter(row=>row.filter(Boolean).length>=2);
+ if(nonEmptyRows.length<3)return [];
+ return [{id:"table-aligned",rows:data,columns:bounds.length-1,confidence:.52,headerRow:0,tableType:"aligned-columns"}];
+}
+function topologicalReadingOrder(labels,connections){
+ const directed=(connections||[]).filter(x=>x.directionKnown&&x.confidence>=.62);
+ if(!directed.length)return [];
+ const nodes=unique(directed.flatMap(x=>[x.from,x.to])),edges=new Map(nodes.map(n=>[n,new Set()])),indegree=new Map(nodes.map(n=>[n,0]));
+ for(const edge of directed){
+  if(!edges.has(edge.from)||!edges.has(edge.to)||edges.get(edge.from).has(edge.to))continue;
+  edges.get(edge.from).add(edge.to);indegree.set(edge.to,(indegree.get(edge.to)||0)+1);
+ }
+ const positions=new Map((labels||[]).map(x=>[x.text,{x:x.x,y:x.y}]));
+ const queue=nodes.filter(n=>(indegree.get(n)||0)===0).sort((a,b)=>(positions.get(a).y-positions.get(b).y)||(positions.get(a).x-positions.get(b).x));
+ const order=[];
+ while(queue.length){
+  const node=queue.shift();order.push(node);
+  for(const next of edges.get(node)||[]){indegree.set(next,indegree.get(next)-1);if(indegree.get(next)===0){queue.push(next);queue.sort((a,b)=>(positions.get(a).y-positions.get(b).y)||(positions.get(a).x-positions.get(b).x));}}
+ }
+ return order.length>=2&&order.length===nodes.length?order:[];
+}
+function analyzeVisualStructure(canvas,ocrData,fileName){
+ const labels=extractOcrLineBoxes(ocrData,canvas.width,canvas.height);
+ if(!labels.length)return {fileName,kind:"image",labels:[],lines:[],associations:[],connections:[],readingOrder:[],tables:[],confidence:.2,notes:["Keine zuverlässigen Textpositionen aus der OCR erhalten."]};
+ const wordBoxes=extractOcrWordBoxes(ocrData,canvas.width,canvas.height,labels);
+ const raster=buildVisualMask(canvas,labels,wordBoxes),segments=detectAxisSegments(raster.mask,raster.w,raster.h),rawComponents=detectInkComponents(raster.mask.slice(),raster.w,raster.h);
+ const lines=segments.map((line,i)=>({...line,id:"line"+i,arrowAtEnd:arrowAtEndpoint(raster.mask,raster.w,raster.h,line,false),arrowAtStart:arrowAtEndpoint(raster.mask,raster.w,raster.h,line,true)}))
+  .filter(line=>line.length>=Math.max(28,(line.orientation==="horizontal"?raster.w:raster.h)*.065))
+  .map(line=>({...line,arrowDirection:Math.max(line.arrowAtEnd,line.arrowAtStart)>=3?(line.arrowAtEnd>=line.arrowAtStart?"forward":"backward"):"unknown"}));
+ const components=rawComponents.filter(shape=>{
+  const aspect=Math.max(shape.w,shape.h)/Math.max(1,Math.min(shape.w,shape.h));
+  const pageGridLike=shape.w>raster.w*.58&&shape.h>raster.h*.58&&shape.count>raster.w*raster.h*.012&&aspect<1.8;
+  if(pageGridLike)return false;
+  if(aspect<6)return true;
+  return !lines.some(line=>line.orientation==="horizontal"&&shape.w>shape.h*6&&Math.abs(line.y1-(shape.y+shape.h/2))<5&&line.length>=shape.w*.72||line.orientation==="vertical"&&shape.h>shape.w*6&&Math.abs(line.x1-(shape.x+shape.w/2))<5&&line.length>=shape.h*.72);
+ });
+ const associations=[],componentAssociations=[];
+ labels.forEach((label,index)=>{
+  const cx=(label.x+label.w/2)*raster.w,cy=(label.y+label.h/2)*raster.h,threshold=Math.max(24,Math.min(76,Math.hypot(raster.w,raster.h)*.045));
+  let bestLine=null,bestDistance=Infinity;
+  for(const line of lines){const d=pointSegmentDistance(cx,cy,line);if(d<bestDistance){bestDistance=d;bestLine=line;}}
+  if(bestLine&&bestDistance<=threshold)associations.push({label:label.text,lineId:bestLine.id,kind:"near-line",distance:Math.round(bestDistance),confidence:Math.max(.35,1-bestDistance/threshold)});
+  let bestShape=null,shapeDistance=Infinity;
+  for(const shape of components){
+   let d=Infinity;for(const p of shape.samples)d=Math.min(d,rectPointDistance(p.x,p.y,{x:label.x*raster.w,y:label.y*raster.h,w:label.w*raster.w,h:label.h*raster.h}));
+   if(d<shapeDistance){shapeDistance=d;bestShape=shape;}
+  }
+  if(bestShape&&shapeDistance<=threshold*1.15)componentAssociations.push({label:label.text,shapeId:bestShape.id,distance:Math.round(shapeDistance),confidence:Math.max(.3,1-shapeDistance/(threshold*1.15))});
+ });
+ const shapeLines=components.map(shape=>({id:shape.id,orientation:"shape",x1:shape.cx,y1:shape.cy,x2:shape.cx,y2:shape.cy,length:Math.max(shape.w,shape.h)}));
+ for(const association of componentAssociations)associations.push({label:association.label,lineId:association.shapeId,kind:"near-shape",distance:association.distance,confidence:association.confidence});
+ const connections=[];
+ for(const line of lines){
+  const attached=associations.filter(a=>a.lineId===line.id).map(a=>a.label);
+  const distinct=unique(attached);
+  if(distinct.length>=2){
+   const ordered=distinct.map(label=>({label,box:labels.find(x=>x.text===label)})).sort((a,b)=>{
+    const project=x=>((x.box.x+x.box.w/2)*raster.w-line.x1)*(line.x2-line.x1)+((x.box.y+x.box.h/2)*raster.h-line.y1)*(line.y2-line.y1);
+    return project(a)-project(b);
+   }).map(x=>x.label);
+   for(let i=0;i<ordered.length-1;i++)connections.push({from:line.arrowDirection==="backward"?ordered[i+1]:ordered[i],to:line.arrowDirection==="backward"?ordered[i]:ordered[i+1],kind:line.arrowDirection==="unknown"?"shared-line":"arrow-line",directionKnown:line.arrowDirection!=="unknown",confidence:line.arrowDirection==="unknown"?.48:.72,lineId:line.id});
+  }
+ }
+ for(const shape of components){
+  const attached=unique(componentAssociations.filter(a=>a.shapeId===shape.id&&a.confidence>=.55).map(a=>a.label));
+  if(attached.length>=2&&!connections.some(c=>attached.includes(c.from)&&attached.includes(c.to)))for(let i=0;i<attached.length-1;i++)connections.push({from:attached[i],to:attached[i+1],kind:"shared-drawn-shape",directionKnown:false,confidence:.52,shapeId:shape.id});
+ }
+ const gridTables=detectTableGrid(lines,wordBoxes,raster.w,raster.h),tables=gridTables.length?gridTables:detectWhitespaceTable(wordBoxes,raster.w,raster.h);
+ const orderedLabels=labels.map((label,index)=>({...label,index})).sort((a,b)=>a.y-b.y||a.x-b.x);
+ const readingOrder=[];let row=[];
+ for(const label of orderedLabels){
+  if(row.length&&Math.abs(label.y-row.reduce((sum,x)=>sum+x.y,0)/row.length)>Math.max(.018,label.h*.85)){
+   row.sort((a,b)=>a.x-b.x).forEach(x=>readingOrder.push(x.text));row=[];
+  }
+  row.push(label);
+ }
+ row.sort((a,b)=>a.x-b.x).forEach(x=>readingOrder.push(x.text));
+ const arrowConnections=connections.filter(x=>x.directionKnown&&x.confidence>=.65);
+ const flowOrder=topologicalReadingOrder(labels,arrowConnections),finalReadingOrder=flowOrder.length?flowOrder:readingOrder,readingOrderBasis=flowOrder.length?"Pfeilrichtungen (geschätzt)":"Position: oben nach unten, links nach rechts";
+ const tableQuality=tables.length?Math.max(...tables.map(t=>t.confidence)):0;
+ const confidence=Math.min(.9,.35+(labels.length?Math.min(.2,labels.length*.04):0)+(lines.length?Math.min(.14,lines.length*.025):0)+(connections.length?Math.min(.16,connections.length*.06):0)+tableQuality*.2);
+ const output={
+  fileName:String(fileName||"Bild").slice(0,255),kind:tables.length?"table-and-diagram":lines.length||components.length?"diagram":"text-with-layout",
+  width:canvas.width,height:canvas.height,labels:labels.slice(0,80),lines:lines.concat(shapeLines).slice(0,100).map(l=>({id:l.id,orientation:l.orientation,x1:l.x1/raster.w,y1:l.y1/raster.h,x2:l.x2/raster.w,y2:l.y2/raster.h,length:l.length/Math.max(raster.w,raster.h),arrowDirection:l.arrowDirection||"unknown"})),
+  associations:associations.slice(0,100).map(a=>({...a,distance:a.distance/Math.max(raster.w,raster.h)})),
+  connections:connections.slice(0,40),readingOrder:finalReadingOrder.slice(0,50),readingOrderBasis,tables,confidence,notes:[
+   lines.length?"Gerade Linien und Liniennähe wurden geometrisch ausgewertet.":"",
+   connections.length?"Verbindungen beruhen auf gemeinsam erkannten Linien oder Zeichnungskomponenten.":"",
+   tables.length?(tables[0].tableType==="aligned-columns"?"Tabellenspalten wurden über wiederkehrende Wortabstände geschätzt.":"Eine mögliche Tabellenstruktur wurde aus horizontalen und vertikalen Linien abgeleitet."):"",
+   arrowConnections.length?"Pfeilrichtungen wurden an Linienenden heuristisch erkannt.":"Die Leserichtung ist geometrisch geschätzt und nicht als Pfeilfolge bestätigt."
+  ].filter(Boolean)
+ };
+ raster.canvas.width=1;raster.canvas.height=1;
+ return output;
+}
+function visualStructureEvidence(visuals){
+ const parts=[];
+ for(const visual of visuals||[]){
+  if(visual.labels&&visual.labels.length)parts.push("Abbildungsbeschriftungen: "+visual.labels.map(x=>x.text).join(", ")+".");
+  for(const connection of visual.connections||[])parts.push("Die Abbildung verbindet „"+connection.from+"“ mit „"+connection.to+"“"+(connection.directionKnown?" durch eine gerichtete Linie.":" durch eine gemeinsame Linie oder Zeichnungsform.") );
+  if(visual.readingOrder&&visual.readingOrder.length>=3)parts.push("Geschätzte Leserichtung der Abbildung: "+visual.readingOrder.join(" → ")+".");
+  for(const table of visual.tables||[])for(let r=0;r<table.rows.length;r++)if(table.rows[r].some(Boolean))parts.push("Tabellenzeile "+(r+1)+": "+table.rows[r].join(" | ")+".");
+ }
  return parts.join("\n");
 }
-async function recognizeImage(file,worker,allowTopicList=false){
- let bitmap=null,objectUrl="",canvas=null;
+function makeVisualCards(visuals,setId,topicId,settings){
+ const out=[],used=new Set(),limit=Math.min(10,Math.max(3,Math.ceil(settings.cardLimit*.45)));
+ for(const visual of visuals||[]){
+  for(const table of visual.tables||[]){
+   const headers=(table.rows[table.headerRow||0]||[]).map(x=>String(x||"").trim());
+   for(let r=(table.headerRow||0)+1;r<table.rows.length&&out.length<limit;r++){
+    const cells=table.rows[r]||[],rowTitle=String(cells[0]||"").trim();
+    for(let col=1;col<Math.min(cells.length,headers.length)&&out.length<limit;col++){
+     const answer=String(cells[col]||"").trim(),header=headers[col];
+     if(!rowTitle||!header||!answer||answer===rowTitle)continue;
+     const question="Was steht in der Tabelle bei „"+rowTitle+"“ unter „"+header+"“?";
+     const source="Tabellenzeile "+(r+1)+": "+cells.join(" | ")+".";
+     const key=question.toLocaleLowerCase("de");if(used.has(key))continue;used.add(key);
+     out.push({id:setId+"-"+topicId+"-v"+out.length,question,answer,source});
+    }
+   }
+  }
+  for(const relation of visual.connections||[]){
+   if(out.length>=limit)break;
+   const question="Welche Elemente sind in der Abbildung miteinander verbunden?";
+   const answer=relation.from+" ↔ "+relation.to,source="Die Abbildung verbindet „"+relation.from+"“ mit „"+relation.to+"“"+(relation.directionKnown?" durch eine gerichtete Linie.":" durch eine gemeinsame Linie oder Zeichnungsform.");
+   const key=answer.toLocaleLowerCase("de");if(used.has(key))continue;used.add(key);
+   out.push({id:setId+"-"+topicId+"-v"+out.length,question,answer,source});
+  }
+  if(out.length<limit&&visual.readingOrder&&visual.readingOrder.length>=3){
+   const answer=visual.readingOrder.slice(0,12).join(" → "),question="In welcher Reihenfolge sind die Beschriftungen in der Abbildung angeordnet?",source="Geschätzte Leserichtung der Abbildung: "+answer+".";
+   if(!used.has(question)){used.add(question);out.push({id:setId+"-"+topicId+"-v"+out.length,question,answer,source});}
+  }
+ }
+ return out;
+}
+function makeOcrThresholdVariant(sourceCanvas){
+ const variant=document.createElement("canvas");
+ variant.width=sourceCanvas.width;variant.height=sourceCanvas.height;
+ const ctx=variant.getContext("2d",{willReadFrequently:true});
+ if(!ctx)throw new Error("Bildverarbeitung wird in diesem Browser nicht unterstützt.");
+ ctx.drawImage(sourceCanvas,0,0);
+ const frame=ctx.getImageData(0,0,variant.width,variant.height),pixels=frame.data;
+ // A clean black/white pass helps separate blue handwriting from pale notebook lines.
+ for(let i=0;i<pixels.length;i+=4){
+  const luminance=.299*pixels[i]+.587*pixels[i+1]+.114*pixels[i+2];
+  const value=luminance<172?0:255;
+  pixels[i]=pixels[i+1]=pixels[i+2]=value;
+ }
+ ctx.putImageData(frame,0,0);
+ return variant;
+}
+async function recognizeImage(file,worker,status,allowTopicList=false){
+ let bitmap=null,objectUrl="",canvas=null,thresholdCanvas=null;
  try{
   let drawable=null,width=0,height=0;
   if(typeof createImageBitmap==="function"){try{bitmap=await createImageBitmap(file);drawable=bitmap;width=bitmap.width;height=bitmap.height;}catch(e){bitmap=null;}}
@@ -528,23 +1097,66 @@ async function recognizeImage(file,worker,allowTopicList=false){
    width=drawable.naturalWidth;height=drawable.naturalHeight;
   }
   if(!width||!height)throw new Error("Bildgröße konnte nicht erkannt werden.");
-  const scale=Math.min(2.2,Math.max(1,2200/Math.max(width,height)));
+  const scale=Math.min(2.6,Math.max(1,2600/Math.max(width,height)));
   canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(width*scale));canvas.height=Math.max(1,Math.round(height*scale));
   const ctx=canvas.getContext("2d",{willReadFrequently:true});if(!ctx)throw new Error("Bildverarbeitung wird in diesem Browser nicht unterstützt.");
-  ctx.fillStyle="#ffffff";ctx.fillRect(0,0,canvas.width,canvas.height);ctx.filter="grayscale(1) contrast(1.35)";ctx.drawImage(drawable,0,0,canvas.width,canvas.height);ctx.filter="none";
-  const result=await worker.recognize(canvas),text=String(result.data&&result.data.text||"").trim(),confidence=Number(result.data&&result.data.confidence);
-  if(!text)throw new Error("Kein lesbarer Text erkannt. Versuche ein schärferes Foto.");
-  return assertReadableOCR(text,confidence,allowTopicList);
- }finally{if(canvas){canvas.width=1;canvas.height=1;}if(bitmap&&typeof bitmap.close==="function")bitmap.close();if(objectUrl)URL.revokeObjectURL(objectUrl);}
+  ctx.fillStyle="#ffffff";ctx.fillRect(0,0,canvas.width,canvas.height);ctx.filter="grayscale(1) contrast(1.45)";ctx.drawImage(drawable,0,0,canvas.width,canvas.height);ctx.filter="none";
+  thresholdCanvas=makeOcrThresholdVariant(canvas);
+  const attempts=[
+   {image:canvas,psm:"6",label:"Seitenlayout"},
+   {image:canvas,psm:"11",label:"freie Beschriftungen"},
+   {image:thresholdCanvas,psm:"11",label:"starker Kontrast"}
+  ];
+  let best=null;
+  for(let i=0;i<attempts.length;i++){
+   const attempt=attempts[i];
+   if(status)status("Foto analysieren: Durchlauf "+(i+1)+" von "+attempts.length+" ("+attempt.label+") …");
+   try{await worker.setParameters({tessedit_pageseg_mode:attempt.psm,preserve_interword_spaces:"1"});}catch(e){}
+   const result=await worker.recognize(attempt.image,{}, {blocks:true});
+   const data=result&&result.data||{},text=formatOcrLayout(data),confidence=Number(data.confidence)||0,ocrLines=extractOcrLineBoxes(data,canvas.width,canvas.height);
+   if(!text)continue;
+   const quality=textQuality(text,allowTopicList);
+   const score=(quality.ok?1000:0)+(Number(quality.score)||0)*.6+confidence*.4+Math.min(30,ocrLines.length*.35);
+   if(!best||score>best.score)best={text,confidence,quality,score,attempt:attempt.label,data};
+  }
+  try{await worker.setParameters({tessedit_pageseg_mode:"6",preserve_interword_spaces:"1"});}catch(e){}
+  if(!best)throw new Error("Kein lesbarer Text erkannt. Versuche ein schärferes Foto.");
+  if(!best.quality.ok)throw new Error(best.quality.reason+" Probiere ein gerades, scharfes Foto mit weniger Schatten.");
+  const readable=assertReadableOCR(best.text,best.confidence,allowTopicList);
+  const visual=allowTopicList?null:analyzeVisualStructure(canvas,best.data,file.name);
+  return {text:readable,visual};
+ }finally{
+  if(canvas){canvas.width=1;canvas.height=1;}
+  if(thresholdCanvas){thresholdCanvas.width=1;thresholdCanvas.height=1;}
+  if(bitmap&&typeof bitmap.close==="function")bitmap.close();
+  if(objectUrl)URL.revokeObjectURL(objectUrl);
+ }
 }
 async function readFile(file,getWorker,status,allowTopicList=false){
  const name=file.name.toLowerCase();
  if(name.endsWith(".txt")||file.type==="text/plain")return file.text();
  if(name.endsWith(".pdf")||file.type==="application/pdf")return pdfText(file,getWorker,status,allowTopicList);
- if(file.type.startsWith("image/")||/\.(jpg|jpeg|png|webp|heic)$/i.test(name)){const w=await getWorker();status("Foto erkennen: "+file.name);return recognizeImage(file,w,allowTopicList);}
+ if(file.type.startsWith("image/")||/\.(jpg|jpeg|png|webp|heic)$/i.test(name)){const w=await getWorker();status("Foto erkennen: "+file.name);return recognizeImage(file,w,status,allowTopicList);}
  throw new Error("Dateiformat nicht unterstützt: "+file.name);
 }
-async function readFiles(files,status,allowTopicList=false){let w=null;const getWorker=async()=>{if(!w)w=await createWorker();return w;},parts=[],names=[],errors=[];try{for(let i=0;i<files.length;i++){status("Datei "+(i+1)+" von "+files.length+": "+files[i].name);try{const txt=await readFile(files[i],getWorker,status,allowTopicList);if(txt.trim().length>3){if(!/\.pdf$/i.test(files[i].name)&&!/\.(jpe?g|png|webp|heic)$/i.test(files[i].name)&&!textQuality(txt,allowTopicList).ok)throw new Error("Der erkannte Text wirkt fehlerhaft. Bitte prüfe die Datei oder füge den Text direkt ein.");parts.push("\n\n--- "+files[i].name+" ---\n"+txt);names.push(files[i].name);}else errors.push(files[i].name+": kein lesbarer Text erkannt");}catch(e){errors.push(files[i].name+": "+e.message);}}}finally{if(w)try{await w.terminate();}catch(e){}}return {text:parts.join("\n").slice(0,120000),names,errors};}
+async function readFiles(files,status,allowTopicList=false){
+ let w=null;const getWorker=async()=>{if(!w)w=await createWorker();return w;},parts=[],names=[],errors=[],visuals=[];
+ try{
+  for(let i=0;i<files.length;i++){
+   status("Datei "+(i+1)+" von "+files.length+": "+files[i].name);
+   try{
+    const extracted=await readFile(files[i],getWorker,status,allowTopicList);
+    const txt=typeof extracted==="string"?extracted:String(extracted&&extracted.text||"");
+    if(txt.trim().length>3){
+     if(!/\.pdf$/i.test(files[i].name)&&!/\.(jpe?g|png|webp|heic)$/i.test(files[i].name)&&!textQuality(txt,allowTopicList).ok)throw new Error("Der erkannte Text wirkt fehlerhaft. Bitte prüfe die Datei oder füge den Text direkt ein.");
+     parts.push("\n\n--- "+files[i].name+" ---\n"+txt);names.push(files[i].name);
+     if(extracted&&Array.isArray(extracted.visuals))visuals.push(...extracted.visuals);else if(extracted&&extracted.visual&&Array.isArray(extracted.visual.labels))visuals.push(extracted.visual);
+    }else errors.push(files[i].name+": kein lesbarer Text erkannt");
+   }catch(e){errors.push(files[i].name+": "+e.message);}
+  }
+ }finally{if(w)try{await w.terminate();}catch(e){}}
+ return {text:parts.join("\n").slice(0,120000),names,errors,visuals};
+}
 function showFileList(){const el=$("file-list");if(el)el.innerHTML=pendingFiles.map((f,i)=>'<div class="file-chip"><span>'+(f.name.toLowerCase().endsWith(".pdf")?"📄":f.type.startsWith("image/")?"🖼️":"📝")+'</span><span style="flex:1;overflow-wrap:anywhere">'+esc(f.name)+' · '+Math.max(1,Math.round(f.size/1024))+' KB</span><button class="btn small" type="button" data-action="remove-file" data-index="'+i+'">Entfernen</button></div>').join("");}
 function openEditMaterial(id){
  const s=getSet(id);if(!s)return;
@@ -593,8 +1205,8 @@ function refreshDifficultyLabel(prefix){const gradeEl=$(prefix+"-grade"),difficu
 document.addEventListener("change",e=>{
  if(e.target.id==="setup-grade")refreshDifficultyLabel("setup");
  if(e.target.id==="profile-grade")refreshDifficultyLabel("profile");
- if(e.target.id==="set-files"){const selected=Array.from(e.target.files||[]),rejected=[];pendingFiles=[];let totalBytes=0;for(const file of selected){if(pendingFiles.length>=8){rejected.push(file.name+" (max. 8 Dateien)");continue;}if(file.size>20*1024*1024){rejected.push(file.name+" (über 20 MB)");continue;}if(totalBytes+file.size>60*1024*1024){rejected.push(file.name+" (Gesamtlimit 60 MB)");continue;}pendingFiles.push(file);totalBytes+=file.size;}showFileList();e.target.value="";if(rejected.length)notify("Übersprungen: "+rejected.length+" Datei(en). Max. 8 Dateien, 20 MB je Datei, 60 MB insgesamt.");}
- if(e.target.id==="set-topic-files"){const selected=Array.from(e.target.files||[]),rejected=[];pendingTopicFiles=[];for(const file of selected){if(pendingTopicFiles.length>=8){rejected.push(file.name+" (max. 8 Dateien)");continue;}if(file.size>20*1024*1024){rejected.push(file.name+" (über 20 MB)");continue;}pendingTopicFiles.push(file);}const el=$("topic-file-list");if(el)el.innerHTML=pendingTopicFiles.map(file=>'<div class="file-chip"><span>🗂️</span><span style="flex:1;overflow-wrap:anywhere">' +esc(file.name)+' · '+Math.max(1,Math.round(file.size/1024))+' KB</span></div>').join("");e.target.value="";if(rejected.length)notify("Einige Themen-Dateien wurden übersprungen (max. 8 Dateien, 20 MB je Datei).");}
+ if(e.target.id==="set-files"){const selected=Array.from(e.target.files||[]),rejected=[];preparedMaterial=null;pendingFiles=[];let totalBytes=0;for(const file of selected){if(pendingFiles.length>=8){rejected.push(file.name+" (max. 8 Dateien)");continue;}if(file.size>20*1024*1024){rejected.push(file.name+" (über 20 MB)");continue;}if(totalBytes+file.size>60*1024*1024){rejected.push(file.name+" (Gesamtlimit 60 MB)");continue;}pendingFiles.push(file);totalBytes+=file.size;}showFileList();e.target.value="";if(rejected.length)notify("Übersprungen: "+rejected.length+" Datei(en). Max. 8 Dateien, 20 MB je Datei, 60 MB insgesamt.");}
+ if(e.target.id==="set-topic-files"){const selected=Array.from(e.target.files||[]),rejected=[];preparedMaterial=null;pendingTopicFiles=[];for(const file of selected){if(pendingTopicFiles.length>=8){rejected.push(file.name+" (max. 8 Dateien)");continue;}if(file.size>20*1024*1024){rejected.push(file.name+" (über 20 MB)");continue;}pendingTopicFiles.push(file);}const el=$("topic-file-list");if(el)el.innerHTML=pendingTopicFiles.map(file=>'<div class="file-chip"><span>🗂️</span><span style="flex:1;overflow-wrap:anywhere">' +esc(file.name)+' · '+Math.max(1,Math.round(file.size/1024))+' KB</span></div>').join("");e.target.value="";if(rejected.length)notify("Einige Themen-Dateien wurden übersprungen (max. 8 Dateien, 20 MB je Datei).");}
  if(e.target.id==="backup-file"&&e.target.files&&e.target.files[0]){const f=e.target.files[0];if(f.size>15*1024*1024){notify("Backup ist zu groß. Maximale Dateigröße: 15 MB.");e.target.value="";return;}const r=new FileReader();r.onload=()=>{try{const obj=JSON.parse(r.result);if(!obj||typeof obj!=="object"||!obj.profile||typeof obj.profile!=="object"||!Array.isArray(obj.sets))throw new Error("Ungültige Backup-Struktur");if(!confirm("Das Backup ersetzt deine Lerndaten. Fortfahren?")){e.target.value="";return;}data=normalizeData(obj);const ok=save();view="home";subjectFilter="";setId="";session=null;renderApp();notify(ok?"Backup importiert.":"Backup geladen, aber der Browser-Speicher ist voll.");}catch(err){notify("Backup ungültig oder beschädigt.");}e.target.value="";};r.readAsText(f);}
 });
 document.addEventListener("click",handleClick);
@@ -606,8 +1218,38 @@ document.addEventListener("submit",async e=>{
   e.preventDefault();if(processing)return;
   const title=$("set-title").value.trim(),subject=$("set-subject").value,exam=$("set-exam").value;let topicInput=$("set-topics").value.trim(),txt=$("set-notes").value.trim();const files=pendingFiles.slice(),topicFiles=pendingTopicFiles.slice();
   if(!title){notify("Gib dem Lernset einen Namen.");return;}if(!txt&&!files.length&&!topicInput&&!topicFiles.length){notify("Füge eine Themenliste oder Lerninhalte ein.");return;}
-  processing=true;const btn=$("create-button"),loader=$("create-loading"),progressTrack=loader&&loader.querySelector(".create-progress-track"),fill=$("create-progress-fill"),label=$("create-progress-label"),percent=$("create-progress-percent"),originalButton=btn.textContent;let progressValue=0;btn.disabled=true;btn.setAttribute("aria-busy","true");btn.textContent="⏳ Wird erstellt …";if(loader){loader.classList.remove("error");loader.classList.add("active");loader.setAttribute("aria-hidden","false");}const updateProgress=value=>{progressValue=Math.max(progressValue,Math.min(100,Math.round(value)));if(fill)fill.style.width=progressValue+"%";if(percent)percent.textContent=progressValue+"%";if(progressTrack)progressTrack.setAttribute("aria-valuenow",String(progressValue));};const status=m=>{const message=String(m||"");const n=$("create-status");if(n)n.textContent=message;if(label)label.textContent=message;let value=14;const fm=message.match(/Datei\s+(\d+)\s+von\s+(\d+)/i),pm=message.match(/PDF lesen:\s*Seite\s+(\d+)\s+von\s+(\d+)/i);if(/Lernmaterial wird vorbereitet/i.test(message))value=6;else if(fm)value=12+(Number(fm[1])-1)/Math.max(1,Number(fm[2]))*62;else if(pm)value=25+Number(pm[1])/Math.max(1,Number(pm[2]))*45;else if(/Foto erkennen/i.test(message))value=48;else if(/Erstelle Übersicht/i.test(message))value=86;updateProgress(value);};status("Lernmaterial wird vorbereitet …");
-  try{let docs=[],errors=[];if(topicFiles.length){status("Themenliste wird eingelesen …");const tr=await readFiles(topicFiles,status,true);if(tr.text.trim().length>=2){topicInput=(topicInput+"\n"+tr.text).trim();}else if(!parseTopicList(topicInput).length){throw new Error(tr.errors[0]||"Themenliste nicht erkannt. Bitte tippe die Themen unten ein oder lade ein klareres Foto/PDF hoch.");}if(tr.errors.length)errors.push("Themenliste: "+tr.errors.join("; "));}if(files.length){const r=await readFiles(files,status);txt=(txt+"\n\n"+r.text).trim();docs=r.names;errors=errors.concat(r.errors);}const parsedTopics=parseTopicList(topicInput);if(topicInput&&!parsedTopics.length)throw new Error("Die Themenliste wurde nicht erkannt. Schreibe jedes Thema in eine eigene Zeile, zum Beispiel: Ständegesellschaft, Ritter und Burgen, Klosterleben.");if(txt.length<25&&!parsedTopics.length)throw new Error("Es wurden keine Lerninhalte oder erkennbaren Themen gefunden. Füge Text, ein PDF oder ein Foto ein.");status(txt.length<25?"Themen erkannt. Erstelle deine Themenübersicht …":"Erstelle Übersicht, Karteikarten und Quizfragen …");const s=makeSet({title,subject,exam,topicInput,text:txt,documents:docs,grade:data.profile.grade,difficulty:data.profile.difficulty});data.sets.unshift(s);data.lastOpened=s.id;const ok=save();closeModal();setId=s.id;view="set";renderApp();notify("Lernset erstellt: "+s.topics.length+" Themen, "+s.topics.reduce((n,t)=>n+t.cards.length,0)+" Karten und "+s.topics.reduce((n,t)=>n+t.questions.length,0)+" Fragen."+(ok?"":" Speicher prüfen."));if(errors.length)alert("Einige Dateien konnten nicht gelesen werden:\n"+errors.join("\n")+"\n\nDu kannst den Text über „Material bearbeiten“ ergänzen.");}
+  processing=true;const btn=$("create-button"),loader=$("create-loading"),progressTrack=loader&&loader.querySelector(".create-progress-track"),fill=$("create-progress-fill"),label=$("create-progress-label"),percent=$("create-progress-percent"),originalButton=btn.textContent;let progressValue=0;btn.disabled=true;btn.setAttribute("aria-busy","true");btn.textContent="⏳ Wird erstellt …";if(loader){loader.classList.remove("error");loader.classList.add("active");loader.setAttribute("aria-hidden","false");}const updateProgress=value=>{progressValue=Math.max(progressValue,Math.min(100,Math.round(value)));if(fill)fill.style.width=progressValue+"%";if(percent)percent.textContent=progressValue+"%";if(progressTrack)progressTrack.setAttribute("aria-valuenow",String(progressValue));};const status=m=>{const message=String(m||"");const n=$("create-status");if(n)n.textContent=message;if(label)label.textContent=message;let value=14;const fm=message.match(/Datei\s+(\d+)\s+von\s+(\d+)/i),pm=message.match(/PDF lesen:\s*Seite\s+(\d+)\s+von\s+(\d+)/i);if(/Lernmaterial wird vorbereitet/i.test(message))value=6;else if(fm)value=12+(Number(fm[1])-1)/Math.max(1,Number(fm[2]))*62;else if(pm)value=25+Number(pm[1])/Math.max(1,Number(pm[2]))*45;else if(/Foto erkennen|Foto analysieren/i.test(message))value=48;else if(/Erstelle Übersicht/i.test(message))value=86;updateProgress(value);};status("Lernmaterial wird vorbereitet …");
+  try{
+   let docs=[],errors=[],visuals=[];
+   if(preparedMaterial){
+    docs=preparedMaterial.docs||[];errors=preparedMaterial.errors||[];visuals=preparedMaterial.visuals||[];
+   }else if(files.length||topicFiles.length){
+    if(topicFiles.length){
+     status("Themenliste wird eingelesen …");
+     const tr=await readFiles(topicFiles,status,true);
+     if(tr.text.trim().length>=2)topicInput=(topicInput+"\n"+tr.text).trim();
+     else if(!parseTopicList(topicInput).length)throw new Error(tr.errors[0]||"Themenliste nicht erkannt. Bitte tippe die Themen unten ein oder lade ein klareres Foto/PDF hoch.");
+     if(tr.errors.length)errors.push("Themenliste: "+tr.errors.join("; "));
+    }
+    if(files.length){
+     const r=await readFiles(files,status);txt=(txt+"\n\n"+r.text).trim();docs=r.names;visuals=visuals.concat(r.visuals||[]);errors=errors.concat(r.errors);
+    }
+    if(txt.length<25&&!parseTopicList(topicInput).length)throw new Error(errors[0]||"Es wurde zu wenig Lernstoff erkannt. Bitte lade ein schärferes Foto/PDF hoch oder füge Text direkt ein.");
+    preparedMaterial={docs,errors,visuals};
+    $("set-notes").value=txt;
+    $("set-topics").value=topicInput;
+    pendingFiles=[];pendingTopicFiles=[];showFileList();
+    const topicListEl=$("topic-file-list");if(topicListEl)topicListEl.innerHTML="";
+    if(loader){loader.classList.remove("active");loader.setAttribute("aria-hidden","true");}
+    status("Erkennung abgeschlossen. Prüfe und korrigiere den erkannten Text sowie die Themenliste, bevor StudyPilot die Lernkarten erstellt.");
+    btn.disabled=false;btn.removeAttribute("aria-busy");btn.textContent="✓ Text geprüft – Lernset erstellen";
+    if(errors.length)notify("Einige Dateien waren nicht lesbar. Prüfe den erkannten Text.");
+    processing=false;
+    return;
+   }
+   if(topicFiles.length){status("Themenliste wird eingelesen …");const tr=await readFiles(topicFiles,status,true);if(tr.text.trim().length>=2){topicInput=(topicInput+"\n"+tr.text).trim();}else if(!parseTopicList(topicInput).length){throw new Error(tr.errors[0]||"Themenliste nicht erkannt. Bitte tippe die Themen unten ein oder lade ein klareres Foto/PDF hoch.");}if(tr.errors.length)errors.push("Themenliste: "+tr.errors.join("; "));}
+   if(files.length){const r=await readFiles(files,status);txt=(txt+"\n\n"+r.text).trim();docs=r.names;errors=errors.concat(r.errors);}
+   const parsedTopics=parseTopicList(topicInput);if(topicInput&&!parsedTopics.length)throw new Error("Die Themenliste wurde nicht erkannt. Schreibe jedes Thema in eine eigene Zeile, zum Beispiel: Ständegesellschaft, Ritter und Burgen, Klosterleben.");if(txt.length<25&&!parsedTopics.length)throw new Error("Es wurden keine Lerninhalte oder erkennbaren Themen gefunden. Füge Text, ein PDF oder ein Foto ein.");status(txt.length<25?"Themen erkannt. Erstelle deine Themenübersicht …":"Erstelle Übersicht, Karteikarten und Quizfragen …");const s=makeSet({title,subject,exam,topicInput,text:txt,documents:docs,visuals,grade:data.profile.grade,difficulty:data.profile.difficulty});preparedMaterial=null;data.sets.unshift(s);data.lastOpened=s.id;const ok=save();closeModal();setId=s.id;view="set";renderApp();notify("Lernset erstellt: "+s.topics.length+" Themen, "+s.topics.reduce((n,t)=>n+t.cards.length,0)+" Karten und "+s.topics.reduce((n,t)=>n+t.questions.length,0)+" Fragen."+(ok?"":" Speicher prüfen."));if(errors.length)alert("Einige Dateien konnten nicht gelesen werden:\n"+errors.join("\n")+"\n\nDu kannst den Text über „Material bearbeiten“ ergänzen.");}
   catch(err){status(err.message||"Ein Fehler ist aufgetreten.");if(loader)loader.classList.add("error");updateProgress(100);btn.disabled=false;btn.removeAttribute("aria-busy");btn.textContent=originalButton;notify("Lernset konnte nicht erstellt werden.");}
   finally{processing=false;}return;
  }
@@ -619,18 +1261,19 @@ document.addEventListener("submit",async e=>{
   const btn=$("edit-submit"),status=$("edit-status"),original=btn.textContent;
   btn.disabled=true;btn.textContent="⏳ Wird verarbeitet …";
   const updateStatus=m=>{if(status)status.textContent=m;};
-  let fileErrors=[];
+  let fileErrors=[],visuals=(old.visuals||[]).slice();
   try{
    let docs=old.documents||[];
    if(files.length){
     const result=await readFiles(files,updateStatus);
     fileErrors=result.errors;
+    visuals=visuals.concat(result.visuals||[]);
     txt=(txt+"\n\n"+result.text).trim();
     docs=unique(docs.concat(result.names));
    }
    if(txt.length<25)throw new Error(fileErrors[0]||"Es wurde zu wenig Lernstoff erkannt. Bitte lade ein weiteres PDF/Foto hoch oder füge mehr Text ein.");
    const oldCardIds=new Set(old.topics.flatMap(t=>t.cards.map(c=>c.id)));
-   const s=makeSet({title,subject:old.subject,exam:old.exam,topicInput:(old.topicNames||[]).join("\n"),text:txt,documents:docs,grade:old.grade||data.profile.grade,difficulty:old.difficulty||data.profile.difficulty});
+   const s=makeSet({title,subject:old.subject,exam:old.exam,topicInput:(old.topicNames||[]).join("\n"),text:txt,documents:docs,visuals,grade:old.grade||data.profile.grade,difficulty:old.difficulty||data.profile.difficulty});
    s.id=old.id;s.createdAt=old.createdAt;
    for(const cardId of oldCardIds)delete data.reviews[cardId];
    delete data.quizStats[old.id];data.sets=data.sets.map(x=>x.id===old.id?s:x);save();closeModal();setId=s.id;view="set";renderApp();
