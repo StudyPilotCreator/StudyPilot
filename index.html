@@ -853,6 +853,18 @@ function detectTableGrid(lines,wordBoxes,w,h){
  const hs=lines.filter(l=>l.orientation==="horizontal"&&l.length>=w*.2).sort((a,b)=>a.y1-b.y1);
  const vs=lines.filter(l=>l.orientation==="vertical"&&l.length>=h*.16).sort((a,b)=>a.x1-b.x1);
  if(hs.length<3||vs.length<2)return [];
+ // Regular notebook ruling can look like a table grid. Do not interpret a dense,
+ // page-spanning, evenly spaced background grid as a real table.
+ const spacingVariation=items=>{
+  const gaps=items.slice(1).map((item,i)=>item-items[i]).filter(x=>x>0);
+  if(gaps.length<4)return 1;
+  const mean=gaps.reduce((sum,x)=>sum+x,0)/gaps.length;
+  return mean?Math.sqrt(gaps.reduce((sum,x)=>sum+(x-mean)*(x-mean),0)/gaps.length)/mean:1;
+ };
+ const hPositions=hs.map(x=>x.y1),vPositions=vs.map(x=>x.x1);
+ const hCoverage=hs.map(x=>x.length).sort((a,b)=>a-b)[Math.floor(hs.length*.75)]||0;
+ const vCoverage=vs.map(x=>x.length).sort((a,b)=>a-b)[Math.floor(vs.length*.75)]||0;
+ if(hs.length>=10&&vs.length>=10&&hCoverage>=w*.82&&vCoverage>=h*.82&&spacingVariation(hPositions)<.16&&spacingVariation(vPositions)<.16)return [];
  const intersections=[];
  for(const hLine of hs)for(const vLine of vs){
   if(vLine.x1>=Math.min(hLine.x1,hLine.x2)-10&&vLine.x1<=Math.max(hLine.x1,hLine.x2)+10&&hLine.y1>=Math.min(vLine.y1,vLine.y2)-10&&hLine.y1<=Math.max(vLine.y1,vLine.y2)+10)intersections.push([hLine.id,vLine.id]);
