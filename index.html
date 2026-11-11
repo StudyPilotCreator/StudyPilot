@@ -617,9 +617,39 @@ function assertReadableOCR(text,confidence,allowTopicList=false){
  if((Number.isFinite(confidence)&&confidence>0&&confidence<minimum)||!q.ok)throw new Error(q.reason+" StudyPilot hat das Material vorsichtshalber nicht übernommen.");
  return String(text).trim();
 }
+function pdfTextItemsToOcrData(items,viewport){
+ const words=[];
+ for(const item of items||[]){
+  const text=String(item.str||"").replace(/\s+/g," ").trim(),transform=item.transform||[];
+  if(!text||transform.length<6)continue;
+  const point=viewport.convertToViewportPoint(Number(transform[4])||0,Number(transform[5])||0);
+  const width=Math.max(5,Math.abs(Number(item.width)||8)*viewport.scale),height=Math.max(7,Math.abs(Number(item.height)||Math.abs(Number(transform[3])||9))*viewport.scale);
+  const x0=Math.max(0,Math.min(viewport.width,point[0])),y1=Math.max(0,Math.min(viewport.height,point[1])),x1=Math.max(x0,Math.min(viewport.width,x0+width)),y0=Math.max(0,Math.min(viewport.height,y1-height));
+  if(x1<=x0||y1<=y0)continue;
+  words.push({text,x0,y0,x1,y1,confidence:100});
+ }
+ if(!words.length)return {text:"",blocks:[],words:[]};
+ const heights=words.map(x=>x.y1-x.y0).sort((a,b)=>a-b),median=heights[Math.floor(heights.length/2)]||12,tolerance=Math.max(5,median*.72),rows=[];
+ for(const word of words.sort((a,b)=>a.y0-b.y0||a.x0-b.x0)){
+  const cy=(word.y0+word.y1)/2;
+  let row=rows.find(x=>Math.abs(x.y-cy)<=tolerance);
+  if(!row){row={y:cy,items:[]};rows.push(row);}
+  row.items.push(word);row.y=row.items.reduce((sum,x)=>sum+(x.y0+x.y1)/2,0)/row.items.length;
+ }
+ rows.sort((a,b)=>a.y-b.y);
+ const lines=rows.map(row=>{
+  const sorted=row.items.sort((a,b)=>a.x0-b.x0),box={x0:Math.min(...sorted.map(x=>x.x0)),y0:Math.min(...sorted.map(x=>x.y0)),x1:Math.max(...sorted.map(x=>x.x1)),y1:Math.max(...sorted.map(x=>x.y1))};
+  return {text:sorted.map(x=>x.text).join(" "),bbox:box,confidence:100};
+ });
+ return {text:lines.map(x=>x.text).join("\n"),blocks:[{paragraphs:[{lines}]}],words:words.map(x=>({text:x.text,bbox:{x0:x.x0,y0:x.y0,x1:x.x1,y1:x.y1},confidence:100})),confidence:100};
+}
+function visualStructureScore(visual){
+ if(!visual)return -1;
+ return (visual.labels||[]).length+(visual.associations||[]).length*.4+(visual.connections||[]).length*2+(visual.tables||[]).length*6;
+}
 async function pdfText(file,getWorker,status,allowTopicList=false){
  await ensurePdf();
- const pdf=await pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise,parts=[],limit=Math.min(pdf.numPages,15);
+ const pdf=await pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise,parts=[],visuals=[],limit=Math.min(pdf.numPages,15);
  for(let n=1;n<=limit;n++){
   status("PDF lesen: Seite "+n+" von "+limit);
   const page=await pdf.getPage(n),tc=await page.getTextContent();
@@ -630,24 +660,42 @@ async function pdfText(file,getWorker,status,allowTopicList=false){
    currentLine+=(currentLine?" ":"")+str;if(Number.isFinite(y))lastY=y;
   }
   if(currentLine.trim())lines.push(currentLine.trim());
-  let txt=lines.join("\n").trim(),quality=textQuality(txt,allowTopicList);
-  if(!quality.ok){
-   status("PDF-Seite "+n+": Texterkennung verbessern …");
-   let canvas=null;
-   try{
-    const w=await getWorker(),v=page.getViewport({scale:2});
-    canvas=document.createElement("canvas");canvas.width=Math.round(v.width);canvas.height=Math.round(v.height);
-    const ctx=canvas.getContext("2d",{willReadFrequently:true});await page.render({canvasContext:ctx,viewport:v}).promise;
-    const result=await w.recognize(canvas),ocr=String(result.data&&result.data.text||"").trim(),oq=textQuality(ocr,allowTopicList);
-    if(oq.ok&&(!quality.ok||oq.score>quality.score))txt=ocr;
-   }catch(e){}
-   finally{if(canvas){canvas.width=1;canvas.height=1;}}
-  }
+  let txt=lines.join("\n").trim(),quality=textQuality(txt,allowTopicList),canvas=null,pageVisual=null;
+  try{
+   if(!allowTopicList){
+    status("PDF-Seite "+n+": Abbildungen und Tabellen analysieren …");
+    const base=page.getViewport({scale:1}),scale=Math.min(1.8,1800/Math.max(base.width,base.height)),viewport=page.getViewport({scale});
+    canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(viewport.width));canvas.height=Math.max(1,Math.round(viewport.height));
+    const ctx=canvas.getContext("2d",{willReadFrequently:true});
+    await page.render({canvasContext:ctx,viewport}).promise;
+    const layoutData=pdfTextItemsToOcrData(tc.items,viewport);
+    if(layoutData.blocks.length&&layoutData.blocks[0].paragraphs[0].lines.length)pageVisual=analyzeVisualStructure(canvas,layoutData,file.name+" · Seite "+n);
+   }
+   if(!quality.ok){
+    status("PDF-Seite "+n+": Texterkennung verbessern …");
+    if(!canvas){
+     const viewport=page.getViewport({scale:Math.min(1.8,1800/Math.max(page.getViewport({scale:1}).width,page.getViewport({scale:1}).height))});
+     canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(viewport.width));canvas.height=Math.max(1,Math.round(viewport.height));
+     await page.render({canvasContext:canvas.getContext("2d",{willReadFrequently:true}),viewport}).promise;
+    }
+    const worker=await getWorker(),result=await worker.recognize(canvas,{}, {blocks:true}),ocr=String(result.data&&result.data.text||"").trim(),ocrQuality=textQuality(ocr,allowTopicList);
+    if(ocrQuality.ok&&(!quality.ok||ocrQuality.score>quality.score)){
+     txt=ocr;quality=ocrQuality;
+     if(!allowTopicList){
+      const ocrVisual=analyzeVisualStructure(canvas,result.data,file.name+" · Seite "+n);
+      if(visualStructureScore(ocrVisual)>visualStructureScore(pageVisual))pageVisual=ocrVisual;
+     }
+    }
+   }
+  }catch(error){
+   if(!quality.ok)throw error;
+  }finally{if(canvas){canvas.width=1;canvas.height=1;}}
   if(!textQuality(txt,allowTopicList).ok)throw new Error("PDF-Seite "+n+" konnte nicht zuverlässig gelesen werden. Bitte exportiere diese Seite als scharfes Foto oder füge den Text direkt ein.");
   if(txt)parts.push("Seite "+n+":\n"+txt);
+  if(pageVisual&&(pageVisual.labels.length||pageVisual.tables.length||pageVisual.connections.length||pageVisual.associations.length))visuals.push(pageVisual);
  }
  if(pdf.numPages>limit)parts.push("[Nur die ersten "+limit+" von "+pdf.numPages+" Seiten wurden ausgelesen.]");
- return parts.join("\n");
+ return {text:parts.join("\n"),visuals};
 }
 function formatOcrLayout(data){
  const lines=[],heights=[];
@@ -1070,7 +1118,7 @@ async function readFiles(files,status,allowTopicList=false){
     if(txt.trim().length>3){
      if(!/\.pdf$/i.test(files[i].name)&&!/\.(jpe?g|png|webp|heic)$/i.test(files[i].name)&&!textQuality(txt,allowTopicList).ok)throw new Error("Der erkannte Text wirkt fehlerhaft. Bitte prüfe die Datei oder füge den Text direkt ein.");
      parts.push("\n\n--- "+files[i].name+" ---\n"+txt);names.push(files[i].name);
-     if(extracted&&extracted.visual&&Array.isArray(extracted.visual.labels))visuals.push(extracted.visual);
+     if(extracted&&Array.isArray(extracted.visuals))visuals.push(...extracted.visuals);else if(extracted&&extracted.visual&&Array.isArray(extracted.visual.labels))visuals.push(extracted.visual);
     }else errors.push(files[i].name+": kein lesbarer Text erkannt");
    }catch(e){errors.push(files[i].name+": "+e.message);}
   }
