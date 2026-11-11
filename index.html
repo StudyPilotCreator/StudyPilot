@@ -518,7 +518,7 @@ function visualEvidenceForCards(visuals){
  const parts=[];
  for(const visual of visuals||[]){
   for(const association of visual.associations||[]){const line=(visual.lines||[]).find(x=>x.id===association.lineId);if(line)parts.push(line.orientation==="shape"?"Die Beschriftung „"+association.label+"“ liegt nahe an einer gezeichneten Linie oder Kurve.":"Die Beschriftung „"+association.label+"“ liegt nahe an einer "+(line.orientation==="horizontal"?"waagerechten":"senkrechten")+" Linie.");}
-  for(const c of visual.connections||[])parts.push("Die Abbildung verbindet „"+c.from+"“ mit „"+c.to+"“"+(c.directionKnown?" durch eine gerichtete Linie.":" durch eine gemeinsame Linie oder Zeichnungsform."));
+  for(const c of visual.connections||[])parts.push("Verbundene Elemente: "+c.from+" ↔ "+c.to+". Die Abbildung verbindet „"+c.from+"“ mit „"+c.to+"“"+(c.directionKnown?" durch eine gerichtete Linie.":" durch eine gemeinsame Linie oder Zeichnungsform."));
   if(visual.readingOrder&&visual.readingOrder.length>=2)parts.push("Geschätzte Leserichtung der Abbildung: "+visual.readingOrder.join(" → ")+".");
   for(const t of visual.tables||[])for(let r=0;r<t.rows.length;r++)if(t.rows[r].some(Boolean))parts.push("Tabellenzeile "+(r+1)+": "+t.rows[r].join(" | ")+".");
  }
@@ -548,7 +548,7 @@ function makeVisualCards(visuals,setId,topicId,settings){
   }
   for(const relation of visual.connections||[]){
    if(out.length>=limit)break;if(relation.confidence<.5)continue;
-   const question="Welche Elemente sind in der Abbildung miteinander verbunden?",answer=relation.from+" ↔ "+relation.to,source="Die Abbildung verbindet „"+relation.from+"“ mit „"+relation.to+"“"+(relation.directionKnown?" durch eine gerichtete Linie.":" durch eine gemeinsame Linie oder Zeichnungsform.");
+   const question="Welche Elemente sind in der Abbildung miteinander verbunden?",answer=relation.from+" ↔ "+relation.to,source="Verbundene Elemente: "+relation.from+" ↔ "+relation.to+". Die Abbildung verbindet „"+relation.from+"“ mit „"+relation.to+"“"+(relation.directionKnown?" durch eine gerichtete Linie.":" durch eine gemeinsame Linie oder Zeichnungsform.");
    if(used.has(answer.toLocaleLowerCase("de")))continue;used.add(answer.toLocaleLowerCase("de"));out.push({id:setId+"-"+topicId+"-v"+out.length,question,answer,source});
   }
   if(out.length<limit&&visual.readingOrder&&visual.readingOrder.length>=2){
@@ -821,7 +821,7 @@ function detectTableGrid(lines,wordBoxes,w,h){
 }
 function detectWhitespaceTable(wordBoxes,w,h){
  const words=(wordBoxes||[]).filter(x=>String(x.text||"").trim()&&x.w>0&&x.h>0);
- if(words.length<9)return [];
+ if(words.length<6)return [];
  const heights=words.map(x=>x.h*h).sort((a,b)=>a-b),median=heights[Math.floor(heights.length/2)]||15,tolerance=Math.max(7,median*.75);
  const rows=[];
  for(const word of words.slice().sort((a,b)=>a.y-b.y||a.x-b.x)){
