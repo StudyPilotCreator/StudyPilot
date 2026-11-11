@@ -447,7 +447,7 @@ function makeQuiz(text,title,set,tId,settings){
   const year=s.match(/\b(?:18|19|20)\d{2}\b/);if(!year||used.has(s))continue;
   const n=Number(year[0]),pool=unique(years.filter(x=>x!==year[0]).concat([n-1,n+1,n+2,n+5,n-5].map(String))).filter(x=>x!==year[0]);
   const opts=optionsFor(year[0],pool);if(opts.length<2)continue;
-  out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Welche Jahreszahl passt zur Aussage?\n"+s.replace(year[0],"_____"),options:opts,correctIndex:opts.indexOf(year[0]),explanation:"Im Material steht: "+s,topicTitle:title});
+  out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Welche Jahreszahl passt zur Aussage?\n"+s.replace(year[0],"_____"),options:opts,correctIndex:opts.indexOf(year[0]),explanation:"Im Material steht: "+s,topicTitle:title,source:s});
   used.add(s);
  }
  const definitions=unique(facts.map(s=>({source:s,definition:parseDefinition(s)})).filter(x=>x.definition).map(x=>({...x,key:x.definition.term.toLocaleLowerCase("de")})).filter((x,i,a)=>a.findIndex(y=>y.key===x.key)===i));
@@ -455,7 +455,7 @@ function makeQuiz(text,title,set,tId,settings){
   if(out.length>=limit)break;
   const otherTerms=definitions.filter(d=>d.key!==item.key).map(d=>d.definition.term),opts=optionsFor(item.definition.term,otherTerms);
   if(opts.length<2)continue;
-  out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Welcher Begriff passt zu dieser Beschreibung?\n"+item.definition.definition,options:opts,correctIndex:opts.indexOf(item.definition.term),explanation:"Im Material wird „"+item.definition.term+"“ so beschrieben: "+item.definition.definition,topicTitle:title});
+  out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Welcher Begriff passt zu dieser Beschreibung?\n"+item.definition.definition,options:opts,correctIndex:opts.indexOf(item.definition.term),explanation:"Im Material wird „"+item.definition.term+"“ so beschrieben: "+item.definition.definition,topicTitle:title,source:item.source});
   used.add(item.source);
  }
  const factQuestions=facts.map(s=>extractFactQuestion(s)).filter(Boolean);
@@ -464,7 +464,7 @@ function makeQuiz(text,title,set,tId,settings){
   if(used.has(item.source))continue;
   const pool=factQuestions.filter(other=>other.type===item.type&&other.source!==item.source).map(other=>other.answer);
   const opts=optionsFor(item.answer,pool);if(opts.length<2)continue;
-  out.push({id:set+"-"+tId+"-q"+out.length,prompt:item.prompt,options:opts,correctIndex:opts.indexOf(item.answer),explanation:"Im Material steht: "+item.source,topicTitle:title});
+  out.push({id:set+"-"+tId+"-q"+out.length,prompt:item.prompt,options:opts,correctIndex:opts.indexOf(item.answer),explanation:"Im Material steht: "+item.source,topicTitle:title,source:item.source});
   used.add(item.source);
  }
  for(const s of facts){
@@ -474,10 +474,27 @@ function makeQuiz(text,title,set,tId,settings){
   const n=Number(match[0]),wrong=[n+1,n-1,n+2,n-2,n+5].map(String).find(x=>!years.includes(x)&&x!==match[0]);
   if(!wrong)continue;
   const statement=s.replace(match[0],wrong);
-  out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Ist diese Aussage laut Material richtig oder falsch?\n"+statement,options:["Richtig","Falsch"],correctIndex:1,explanation:"Im Material steht stattdessen: "+s,topicTitle:title});
+  out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Ist diese Aussage laut Material richtig oder falsch?\n"+statement,options:["Richtig","Falsch"],correctIndex:1,explanation:"Im Material steht stattdessen: "+s,topicTitle:title,source:s});
   used.add(s);
  }
  return out.slice(0,limit);
+}
+function validateGeneratedCards(cards,sourceText){
+ const source=cleanSourceText(sourceText).toLocaleLowerCase("de");
+ return (cards||[]).filter(card=>{
+  const evidence=cleanSourceText(card.source||"").toLocaleLowerCase("de");
+  const answer=cleanSourceText(card.answer||"").toLocaleLowerCase("de");
+  return evidence.length>=18&&source.includes(evidence)&&answer.length>0&&evidence.includes(answer)&&String(card.question||"").trim().length>=8&&String(card.question||"").length<=360;
+ });
+}
+function validateGeneratedQuiz(questions,sourceText){
+ const source=cleanSourceText(sourceText).toLocaleLowerCase("de");
+ return (questions||[]).filter(question=>{
+  const evidence=cleanSourceText(question.source||"").toLocaleLowerCase("de");
+  const options=Array.isArray(question.options)?question.options.map(x=>String(x||"").trim()):[];
+  const distinct=new Set(options.map(x=>x.toLocaleLowerCase("de")));
+  return evidence.length>=18&&source.includes(evidence)&&options.length>=2&&options.length<=4&&distinct.size===options.length&&Number.isInteger(question.correctIndex)&&question.correctIndex>=0&&question.correctIndex<options.length&&options[question.correctIndex].length>0&&String(question.prompt||"").trim().length>=8;
+ });
 }
 function makeSet(input){
  const source=cleanSourceText(input.text),id=uid(),names=chooseTopics(source,input.title,input.topicInput),sentences=splitSentences(source),settings=levelSettings(input.grade,input.difficulty),multiTopic=names.length>1;
@@ -485,7 +502,9 @@ function makeSet(input){
   const matching=sentences.filter(s=>topicScore(s,title)>0),hasMatch=matching.length>0;
   const content=hasMatch?matching.join(" "):(multiTopic?"":source);
   const summary=content?bestFacts(content,title,settings.summaryLimit):[];
-  return {id:uid(),title,summary,cards:makeCards(content,title,id,"t"+i,settings),questions:makeQuiz(content,title,id,"t"+i,settings),sourceText:content,matchMode:hasMatch?"matched":(multiTopic?"unmatched":"general")};
+  const draftCards=makeCards(content,title,id,"t"+i,settings),draftQuestions=makeQuiz(content,title,id,"t"+i,settings);
+  const cards=validateGeneratedCards(draftCards,content),questions=validateGeneratedQuiz(draftQuestions,content);
+  return {id:uid(),title,summary,cards,questions,sourceText:content,matchMode:hasMatch?"matched":(multiTopic?"unmatched":"general"),quality:{cardsChecked:draftCards.length,questionsChecked:draftQuestions.length,cardsAccepted:cards.length,questionsAccepted:questions.length}};
  });
  return {id,title:input.title,subject:input.subject,exam:input.exam,grade:settings.grade,difficulty:settings.level,topicNames:names,content:source.slice(0,120000),documents:input.documents||[],topics,createdAt:new Date().toISOString()};
 }
@@ -649,7 +668,7 @@ async function readFile(file,getWorker,status,allowTopicList=false){
  const name=file.name.toLowerCase();
  if(name.endsWith(".txt")||file.type==="text/plain")return file.text();
  if(name.endsWith(".pdf")||file.type==="application/pdf")return pdfText(file,getWorker,status,allowTopicList);
- if(file.type.startsWith("image/")||/\.(jpg|jpeg|png|webp|heic)$/i.test(name)){const w=await getWorker();status("Foto erkennen: "+file.name);return recognizeImage(file,w,allowTopicList);}
+ if(file.type.startsWith("image/")||/\.(jpg|jpeg|png|webp|heic)$/i.test(name)){const w=await getWorker();status("Foto erkennen: "+file.name);return recognizeImage(file,w,status,allowTopicList);}
  throw new Error("Dateiformat nicht unterstützt: "+file.name);
 }
 async function readFiles(files,status,allowTopicList=false){let w=null;const getWorker=async()=>{if(!w)w=await createWorker();return w;},parts=[],names=[],errors=[];try{for(let i=0;i<files.length;i++){status("Datei "+(i+1)+" von "+files.length+": "+files[i].name);try{const txt=await readFile(files[i],getWorker,status,allowTopicList);if(txt.trim().length>3){if(!/\.pdf$/i.test(files[i].name)&&!/\.(jpe?g|png|webp|heic)$/i.test(files[i].name)&&!textQuality(txt,allowTopicList).ok)throw new Error("Der erkannte Text wirkt fehlerhaft. Bitte prüfe die Datei oder füge den Text direkt ein.");parts.push("\n\n--- "+files[i].name+" ---\n"+txt);names.push(files[i].name);}else errors.push(files[i].name+": kein lesbarer Text erkannt");}catch(e){errors.push(files[i].name+": "+e.message);}}}finally{if(w)try{await w.terminate();}catch(e){}}return {text:parts.join("\n").slice(0,120000),names,errors};}
@@ -719,7 +738,6 @@ document.addEventListener("submit",async e=>{
    let docs=[],errors=[];
    if(preparedMaterial){
     docs=preparedMaterial.docs||[];errors=preparedMaterial.errors||[];
-    preparedMaterial=null;
    }else if(files.length||topicFiles.length){
     if(topicFiles.length){
      status("Themenliste wird eingelesen …");
@@ -746,7 +764,7 @@ document.addEventListener("submit",async e=>{
    }
    if(topicFiles.length){status("Themenliste wird eingelesen …");const tr=await readFiles(topicFiles,status,true);if(tr.text.trim().length>=2){topicInput=(topicInput+"\n"+tr.text).trim();}else if(!parseTopicList(topicInput).length){throw new Error(tr.errors[0]||"Themenliste nicht erkannt. Bitte tippe die Themen unten ein oder lade ein klareres Foto/PDF hoch.");}if(tr.errors.length)errors.push("Themenliste: "+tr.errors.join("; "));}
    if(files.length){const r=await readFiles(files,status);txt=(txt+"\n\n"+r.text).trim();docs=r.names;errors=errors.concat(r.errors);}
-   const parsedTopics=parseTopicList(topicInput);if(topicInput&&!parsedTopics.length)throw new Error("Die Themenliste wurde nicht erkannt. Schreibe jedes Thema in eine eigene Zeile, zum Beispiel: Ständegesellschaft, Ritter und Burgen, Klosterleben.");if(txt.length<25&&!parsedTopics.length)throw new Error("Es wurden keine Lerninhalte oder erkennbaren Themen gefunden. Füge Text, ein PDF oder ein Foto ein.");status(txt.length<25?"Themen erkannt. Erstelle deine Themenübersicht …":"Erstelle Übersicht, Karteikarten und Quizfragen …");const s=makeSet({title,subject,exam,topicInput,text:txt,documents:docs,grade:data.profile.grade,difficulty:data.profile.difficulty});data.sets.unshift(s);data.lastOpened=s.id;const ok=save();closeModal();setId=s.id;view="set";renderApp();notify("Lernset erstellt: "+s.topics.length+" Themen, "+s.topics.reduce((n,t)=>n+t.cards.length,0)+" Karten und "+s.topics.reduce((n,t)=>n+t.questions.length,0)+" Fragen."+(ok?"":" Speicher prüfen."));if(errors.length)alert("Einige Dateien konnten nicht gelesen werden:\n"+errors.join("\n")+"\n\nDu kannst den Text über „Material bearbeiten“ ergänzen.");}
+   const parsedTopics=parseTopicList(topicInput);if(topicInput&&!parsedTopics.length)throw new Error("Die Themenliste wurde nicht erkannt. Schreibe jedes Thema in eine eigene Zeile, zum Beispiel: Ständegesellschaft, Ritter und Burgen, Klosterleben.");if(txt.length<25&&!parsedTopics.length)throw new Error("Es wurden keine Lerninhalte oder erkennbaren Themen gefunden. Füge Text, ein PDF oder ein Foto ein.");status(txt.length<25?"Themen erkannt. Erstelle deine Themenübersicht …":"Erstelle Übersicht, Karteikarten und Quizfragen …");const s=makeSet({title,subject,exam,topicInput,text:txt,documents:docs,grade:data.profile.grade,difficulty:data.profile.difficulty});preparedMaterial=null;data.sets.unshift(s);data.lastOpened=s.id;const ok=save();closeModal();setId=s.id;view="set";renderApp();notify("Lernset erstellt: "+s.topics.length+" Themen, "+s.topics.reduce((n,t)=>n+t.cards.length,0)+" Karten und "+s.topics.reduce((n,t)=>n+t.questions.length,0)+" Fragen."+(ok?"":" Speicher prüfen."));if(errors.length)alert("Einige Dateien konnten nicht gelesen werden:\n"+errors.join("\n")+"\n\nDu kannst den Text über „Material bearbeiten“ ergänzen.");}
   catch(err){status(err.message||"Ein Fehler ist aufgetreten.");if(loader)loader.classList.add("error");updateProgress(100);btn.disabled=false;btn.removeAttribute("aria-busy");btn.textContent=originalButton;notify("Lernset konnte nicht erstellt werden.");}
   finally{processing=false;}return;
  }
