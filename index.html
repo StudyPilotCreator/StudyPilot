@@ -131,7 +131,7 @@ function normalizeVisualStructures(list){
   associations:(Array.isArray(v.associations)?v.associations:[]).slice(0,80).map(x=>({label:String(x.label||"").slice(0,180),lineId:String(x.lineId||"").slice(0,30),kind:String(x.kind||"near-line").slice(0,30),distance:Math.max(0,Math.min(1,Number(x.distance)||0)),confidence:Math.max(0,Math.min(1,Number(x.confidence)||0))})),
   connections:(Array.isArray(v.connections)?v.connections:[]).slice(0,40).map(x=>({from:String(x.from||"").slice(0,180),to:String(x.to||"").slice(0,180),kind:String(x.kind||"shared-line").slice(0,40),directionKnown:Boolean(x.directionKnown),confidence:Math.max(0,Math.min(1,Number(x.confidence)||0)),lineId:String(x.lineId||"").slice(0,30)})),
   readingOrder:(Array.isArray(v.readingOrder)?v.readingOrder:[]).filter(x=>typeof x==="string").map(x=>x.slice(0,180)).slice(0,50),readingOrderBasis:String(v.readingOrderBasis||"Position").slice(0,80),
-  tables:(Array.isArray(v.tables)?v.tables:[]).slice(0,5).map(t=>({id:String(t.id||"table").slice(0,20),columns:Math.max(0,Number(t.columns)||0),confidence:Math.max(0,Math.min(1,Number(t.confidence)||0)),headerRow:Math.max(0,Number(t.headerRow)||0),rows:(Array.isArray(t.rows)?t.rows:[]).slice(0,25).map(row=>(Array.isArray(row)?row:[]).slice(0,12).map(cell=>String(cell||"").slice(0,300)))})),
+  tables:(Array.isArray(v.tables)?v.tables:[]).slice(0,5).map(t=>({id:String(t.id||"table").slice(0,20),columns:Math.max(0,Number(t.columns)||0),confidence:Math.max(0,Math.min(1,Number(t.confidence)||0)),headerRow:Math.max(0,Number(t.headerRow)||0),rows:(Array.isArray(t.rows)?t.rows:[]).slice(0,25).map(row=>(Array.isArray(row)?row:[]).slice(0,12).map(cell=>String(cell||"").slice(0,300))),tableType:String(t.tableType||"grid").slice(0,30)})),
   confidence:Math.max(0,Math.min(1,Number(v.confidence)||0)),notes:(Array.isArray(v.notes)?v.notes:[]).filter(x=>typeof x==="string").map(x=>x.slice(0,250)).slice(0,8)
  }));
 }
@@ -517,9 +517,9 @@ function visualsForTopic(visuals,title,multiTopic=false){return (visuals||[]).fi
 function visualEvidenceForCards(visuals){
  const parts=[];
  for(const visual of visuals||[]){
-  for(const association of visual.associations||[]){const line=(visual.lines||[]).find(x=>x.id===association.lineId);if(line)parts.push("Die Beschriftung „"+association.label+"“ liegt nahe an einer "+line.orientation+"en Linie.");}
+  for(const association of visual.associations||[]){const line=(visual.lines||[]).find(x=>x.id===association.lineId);if(line)parts.push(line.orientation==="shape"?"Die Beschriftung „"+association.label+"“ liegt nahe an einer gezeichneten Linie oder Kurve.":"Die Beschriftung „"+association.label+"“ liegt nahe an einer "+(line.orientation==="horizontal"?"waagerechten":"senkrechten")+" Linie.");}
   for(const c of visual.connections||[])parts.push("Die Abbildung verbindet „"+c.from+"“ mit „"+c.to+"“"+(c.directionKnown?" durch eine gerichtete Linie.":" durch eine gemeinsame Linie oder Zeichnungsform."));
-  if(visual.readingOrder&&visual.readingOrder.length>=3)parts.push("Geschätzte Leserichtung der Abbildung: "+visual.readingOrder.join(" → ")+".");
+  if(visual.readingOrder&&visual.readingOrder.length>=2)parts.push("Geschätzte Leserichtung der Abbildung: "+visual.readingOrder.join(" → ")+".");
   for(const t of visual.tables||[])for(let r=0;r<t.rows.length;r++)if(t.rows[r].some(Boolean))parts.push("Tabellenzeile "+(r+1)+": "+t.rows[r].join(" | ")+".");
  }
  return parts.join("\n");
@@ -540,8 +540,10 @@ function makeVisualCards(visuals,setId,topicId,settings){
   }
   for(const association of visual.associations||[]){
    if(out.length>=limit)break;const line=(visual.lines||[]).find(x=>x.id===association.lineId);if(!line||association.confidence<.48)continue;
-   const area=line.orientation==="horizontal"?(line.y1<.33?"im oberen":line.y1>.66?"im unteren":"im mittleren"):(line.x1<.33?"im linken":line.x1>.66?"im rechten":"im mittleren");
-   const question="Welche Beschriftung liegt nahe an der "+line.orientation+"en Linie "+area+" Bildbereich?",answer=association.label,source="Die Beschriftung „"+association.label+"“ liegt nahe an einer "+line.orientation+"en Linie.";
+   const shape=line.orientation==="shape",direction=line.orientation==="horizontal"?"waagerechten":"senkrechten";
+   const area=shape?"":(line.orientation==="horizontal"?(line.y1<.33?" im oberen":line.y1>.66?" im unteren":" im mittleren"):(line.x1<.33?" im linken":line.x1>.66?" im rechten":" im mittleren"));
+   const question=shape?"Welche Beschriftung liegt nahe an einer gezeichneten Linie oder Kurve?":"Welche Beschriftung liegt nahe an der "+direction+" Linie"+area+" Bildbereich?";
+   const answer=association.label,source=shape?"Die Beschriftung „"+association.label+"“ liegt nahe an einer gezeichneten Linie oder Kurve.":"Die Beschriftung „"+association.label+"“ liegt nahe an einer "+direction+" Linie.";
    if(used.has(question))continue;used.add(question);out.push({id:setId+"-"+topicId+"-v"+out.length,question,answer,source});
   }
   for(const relation of visual.connections||[]){
@@ -549,8 +551,8 @@ function makeVisualCards(visuals,setId,topicId,settings){
    const question="Welche Elemente sind in der Abbildung miteinander verbunden?",answer=relation.from+" ↔ "+relation.to,source="Die Abbildung verbindet „"+relation.from+"“ mit „"+relation.to+"“"+(relation.directionKnown?" durch eine gerichtete Linie.":" durch eine gemeinsame Linie oder Zeichnungsform.");
    if(used.has(answer.toLocaleLowerCase("de")))continue;used.add(answer.toLocaleLowerCase("de"));out.push({id:setId+"-"+topicId+"-v"+out.length,question,answer,source});
   }
-  if(out.length<limit&&visual.readingOrder&&visual.readingOrder.length>=3){
-   const answer=visual.readingOrder.slice(0,12).join(" → "),question="In welcher Reihenfolge sind die Beschriftungen in der Abbildung angeordnet?",source="Geschätzte Leserichtung der Abbildung: "+answer+".";
+  if(out.length<limit&&visual.readingOrder&&visual.readingOrder.length>=2){
+   const answer=visual.readingOrder.slice(0,12).join(" → "),question=String(visual.readingOrderBasis||"").includes("Pfeil")?"Welche Reihenfolge ergibt sich aus den Pfeilrichtungen?":"Wie ist die räumliche Leserichtung in der Abbildung?",source="Geschätzte Leserichtung der Abbildung: "+answer+".";
    if(!used.has(question)){used.add(question);out.push({id:setId+"-"+topicId+"-v"+out.length,question,answer,source});}
   }
  }
@@ -560,10 +562,10 @@ function getTopicVisuals(set,topic){return visualsForTopic(set&&set.visuals,topi
 function renderVisualAnalysis(visuals){
  if(!visuals||!visuals.length)return "";
  return '<section class="panel glass" style="margin-top:14px"><div class="panel-head"><h2>Abbildungen und Tabellen</h2><span class="small-text">'+visuals.length+' analysiert</span></div>'+visuals.map(visual=>{
-  const labels=(visual.labels||[]).map(x=>x.text),associations=(visual.associations||[]).map(a=>{const line=(visual.lines||[]).find(x=>x.id===a.lineId);return line?'<div class="simple-row"><div class="simple-row-icon">↔</div><div class="simple-row-main"><div class="simple-row-title">'+esc(a.label)+'</div><div class="simple-row-meta">Nahe an einer '+esc(line.orientation)+'en Linie · '+Math.round((a.confidence||0)*100)+'% Zuordnungssicherheit</div></div></div>':"";}).join("");
+  const labels=(visual.labels||[]).map(x=>x.text),associations=(visual.associations||[]).map(a=>{const line=(visual.lines||[]).find(x=>x.id===a.lineId),descriptor=line?(line.orientation==="shape"?"gezeichneten Linie oder Kurve":line.orientation==="horizontal"?"waagerechten Linie":"senkrechten Linie"):"";return line?'<div class="simple-row"><div class="simple-row-icon">↔</div><div class="simple-row-main"><div class="simple-row-title">'+esc(a.label)+'</div><div class="simple-row-meta">Nahe an einer '+descriptor+' · '+Math.round((a.confidence||0)*100)+'% Zuordnungssicherheit</div></div></div>':"";}).join("");
   const connections=(visual.connections||[]).map(c=>'<div class="simple-row"><div class="simple-row-icon">'+(c.directionKnown?"➜":"↔")+'</div><div class="simple-row-main"><div class="simple-row-title">'+esc(c.from)+(c.directionKnown?" → ":" ↔ ")+esc(c.to)+'</div><div class="simple-row-meta">'+(c.directionKnown?"Pfeilrichtung geschätzt":"Gemeinsame Linie oder Zeichnungsform · Richtung nicht sicher")+'</div></div></div>').join("");
   const tables=(visual.tables||[]).map(table=>'<div style="overflow:auto;margin-top:9px"><table style="width:100%;border-collapse:collapse;font-size:11px"><tbody>'+table.rows.map((row,i)=>'<tr>'+row.map(cell=>'<'+(i===0?"th":"td")+' style="border:1px solid var(--line);padding:8px;text-align:left">'+esc(cell||"")+'</'+(i===0?"th":"td")+'>').join("")+'</tr>').join("")+'</tbody></table></div>').join("");
-  const order=(visual.readingOrder||[]).length?'<div class="form-note" style="margin-top:10px"><strong>Geschätzte Leserichtung:</strong> '+visual.readingOrder.map(esc).join(" → ")+'</div>':"";
+  const order=(visual.readingOrder||[]).length?'<div class="form-note" style="margin-top:10px"><strong>'+esc(visual.readingOrderBasis||"Geschätzte Leserichtung")+":</strong> '+visual.readingOrder.map(esc).join(" → ")+'</div>':"";
   return '<div style="padding:13px 0;border-top:1px solid var(--line)"><div style="display:flex;justify-content:space-between;gap:10px"><strong>'+esc(visual.fileName||"Abbildung")+'</strong><span class="small-text">Analyse: '+Math.round((visual.confidence||0)*100)+'%</span></div>'+(labels.length?'<div class="small-text" style="margin-top:10px">Erkannte Beschriftungen</div><div class="chips" style="margin-top:7px">'+labels.map(x=>'<span class="chip">'+esc(x)+'</span>').join("")+'</div>':"")+(associations?'<div class="small-text" style="margin-top:12px">Beschriftung und Linie</div><div class="simple-list" style="margin-top:6px">'+associations+'</div>':"")+(connections?'<div class="small-text" style="margin-top:12px">Erkannte Verbindungen</div><div class="simple-list" style="margin-top:6px">'+connections+'</div>':"")+order+tables+'<p class="small-text" style="line-height:1.6;margin:10px 0 0">Automatische geometrische Schätzung. Prüfe besonders Linienzuordnung und Pfeilrichtung anhand des Originals.</p></div>';
  }).join("")+'</section>';
 }
@@ -860,7 +862,7 @@ function detectWhitespaceTable(wordBoxes,w,h){
 function topologicalReadingOrder(labels,connections){
  const directed=(connections||[]).filter(x=>x.directionKnown&&x.confidence>=.62);
  if(!directed.length)return [];
- const nodes=unique((labels||[]).map(x=>x.text)),edges=new Map(nodes.map(n=>[n,new Set()])),indegree=new Map(nodes.map(n=>[n,0]));
+ const nodes=unique(directed.flatMap(x=>[x.from,x.to])),edges=new Map(nodes.map(n=>[n,new Set()])),indegree=new Map(nodes.map(n=>[n,0]));
  for(const edge of directed){
   if(!edges.has(edge.from)||!edges.has(edge.to)||edges.get(edge.from).has(edge.to))continue;
   edges.get(edge.from).add(edge.to);indegree.set(edge.to,(indegree.get(edge.to)||0)+1);
@@ -872,7 +874,7 @@ function topologicalReadingOrder(labels,connections){
   const node=queue.shift();order.push(node);
   for(const next of edges.get(node)||[]){indegree.set(next,indegree.get(next)-1);if(indegree.get(next)===0){queue.push(next);queue.sort((a,b)=>(positions.get(a).y-positions.get(b).y)||(positions.get(a).x-positions.get(b).x));}}
  }
- return order.length>=2?order:[];
+ return order.length>=2&&order.length===nodes.length?order:[];
 }
 function analyzeVisualStructure(canvas,ocrData,fileName){
  const labels=extractOcrLineBoxes(ocrData,canvas.width,canvas.height);
