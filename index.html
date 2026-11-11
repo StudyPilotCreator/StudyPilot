@@ -565,7 +565,7 @@ function renderVisualAnalysis(visuals){
   const labels=(visual.labels||[]).map(x=>x.text),associations=(visual.associations||[]).map(a=>{const line=(visual.lines||[]).find(x=>x.id===a.lineId),descriptor=line?(line.orientation==="shape"?"gezeichneten Linie oder Kurve":line.orientation==="horizontal"?"waagerechten Linie":"senkrechten Linie"):"";return line?'<div class="simple-row"><div class="simple-row-icon">↔</div><div class="simple-row-main"><div class="simple-row-title">'+esc(a.label)+'</div><div class="simple-row-meta">Nahe an einer '+descriptor+' · '+Math.round((a.confidence||0)*100)+'% Zuordnungssicherheit</div></div></div>':"";}).join("");
   const connections=(visual.connections||[]).map(c=>'<div class="simple-row"><div class="simple-row-icon">'+(c.directionKnown?"➜":"↔")+'</div><div class="simple-row-main"><div class="simple-row-title">'+esc(c.from)+(c.directionKnown?" → ":" ↔ ")+esc(c.to)+'</div><div class="simple-row-meta">'+(c.directionKnown?"Pfeilrichtung geschätzt":"Gemeinsame Linie oder Zeichnungsform · Richtung nicht sicher")+'</div></div></div>').join("");
   const tables=(visual.tables||[]).map(table=>'<div style="overflow:auto;margin-top:9px"><table style="width:100%;border-collapse:collapse;font-size:11px"><tbody>'+table.rows.map((row,i)=>'<tr>'+row.map(cell=>'<'+(i===0?"th":"td")+' style="border:1px solid var(--line);padding:8px;text-align:left">'+esc(cell||"")+'</'+(i===0?"th":"td")+'>').join("")+'</tr>').join("")+'</tbody></table></div>').join("");
-  const order=(visual.readingOrder||[]).length?'<div class="form-note" style="margin-top:10px"><strong>'+esc(visual.readingOrderBasis||"Geschätzte Leserichtung")+":</strong> '+visual.readingOrder.map(esc).join(" → ")+'</div>':"";
+  const order=(visual.readingOrder||[]).length?'<div class="form-note" style="margin-top:10px"><strong>'+esc(visual.readingOrderBasis||"Geschätzte Leserichtung")+'</strong> '+visual.readingOrder.map(esc).join(" → ")+'</div>':"";
   return '<div style="padding:13px 0;border-top:1px solid var(--line)"><div style="display:flex;justify-content:space-between;gap:10px"><strong>'+esc(visual.fileName||"Abbildung")+'</strong><span class="small-text">Analyse: '+Math.round((visual.confidence||0)*100)+'%</span></div>'+(labels.length?'<div class="small-text" style="margin-top:10px">Erkannte Beschriftungen</div><div class="chips" style="margin-top:7px">'+labels.map(x=>'<span class="chip">'+esc(x)+'</span>').join("")+'</div>':"")+(associations?'<div class="small-text" style="margin-top:12px">Beschriftung und Linie</div><div class="simple-list" style="margin-top:6px">'+associations+'</div>':"")+(connections?'<div class="small-text" style="margin-top:12px">Erkannte Verbindungen</div><div class="simple-list" style="margin-top:6px">'+connections+'</div>':"")+order+tables+'<p class="small-text" style="line-height:1.6;margin:10px 0 0">Automatische geometrische Schätzung. Prüfe besonders Linienzuordnung und Pfeilrichtung anhand des Originals.</p></div>';
  }).join("")+'</section>';
 }
@@ -650,15 +650,16 @@ async function pdfText(file,getWorker,status,allowTopicList=false){
  return parts.join("\n");
 }
 function formatOcrLayout(data){
- const lines=[];
+ const lines=[],heights=[];
  for(const block of data&&Array.isArray(data.blocks)?data.blocks:[]){
   for(const paragraph of block.paragraphs||[])for(const line of paragraph.lines||[]){
    const text=String(line.text||"").replace(/\s+/g," ").trim(),box=line.bbox||{};
    if(text&&Number.isFinite(Number(box.x0))&&Number.isFinite(Number(box.y0)))lines.push({text,x:Number(box.x0),y:Number(box.y0)});
+   heights.push(Math.max(1,Number(box.y1)-Number(box.y0)));
   }
  }
  if(lines.length<2)return String(data&&data.text||"").trim();
- const heights=(data.blocks||[]).flatMap(b=>(b.paragraphs||[]).flatMap(p=>(p.lines||[]).map(l=>Math.max(1,Number(l.bbox&&l.bbox.y1)-Number(l.bbox&&l.bbox.y0)))))).sort((a,b)=>a-b);
+ heights.sort((a,b)=>a-b);
  const median=heights[Math.floor(heights.length/2)]||18;
  lines.sort((a,b)=>a.y-b.y||a.x-b.x);
  const rows=[];
