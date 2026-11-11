@@ -742,7 +742,8 @@ function extractOcrWordBoxes(data,width,height,lines){
  }
  return words.length?words:lines;
 }
-function buildVisualMask(canvas,labels){
+function buildVisualMask(canvas,labels,wordBoxes){
+ const exclusions=wordBoxes&&wordBoxes.length?wordBoxes:labels;
  const maxWidth=920,scale=Math.min(1,maxWidth/canvas.width),w=Math.max(1,Math.round(canvas.width*scale)),h=Math.max(1,Math.round(canvas.height*scale));
  const work=document.createElement("canvas");work.width=w;work.height=h;
  const ctx=work.getContext("2d",{willReadFrequently:true});if(!ctx)throw new Error("Visuelle Analyse nicht verfügbar.");
@@ -753,7 +754,7 @@ function buildVisualMask(canvas,labels){
   if(l<128)mask[y*w+x]=1;
  }
  // Remove OCR text regions so handwriting is not mistaken for diagram edges.
- for(const label of labels){
+ for(const label of exclusions){
   const x0=Math.max(0,Math.floor(label.x*w)-3),x1=Math.min(w,Math.ceil((label.x+label.w)*w)+3);
   const y0=Math.max(0,Math.floor(label.y*h)-3),y1=Math.min(h,Math.ceil((label.y+label.h)*h)+3);
   for(let y=y0;y<y1;y++)mask.fill(0,y*w+x0,y*w+x1);
@@ -929,7 +930,7 @@ function analyzeVisualStructure(canvas,ocrData,fileName){
  const labels=extractOcrLineBoxes(ocrData,canvas.width,canvas.height);
  if(!labels.length)return {fileName,kind:"image",labels:[],lines:[],associations:[],connections:[],readingOrder:[],tables:[],confidence:.2,notes:["Keine zuverlässigen Textpositionen aus der OCR erhalten."]};
  const wordBoxes=extractOcrWordBoxes(ocrData,canvas.width,canvas.height,labels);
- const raster=buildVisualMask(canvas,labels),segments=detectAxisSegments(raster.mask,raster.w,raster.h),rawComponents=detectInkComponents(raster.mask.slice(),raster.w,raster.h);
+ const raster=buildVisualMask(canvas,labels,wordBoxes),segments=detectAxisSegments(raster.mask,raster.w,raster.h),rawComponents=detectInkComponents(raster.mask.slice(),raster.w,raster.h);
  const lines=segments.map((line,i)=>({...line,id:"line"+i,arrowAtEnd:arrowAtEndpoint(raster.mask,raster.w,raster.h,line,false),arrowAtStart:arrowAtEndpoint(raster.mask,raster.w,raster.h,line,true)}))
   .filter(line=>line.length>=Math.max(28,(line.orientation==="horizontal"?raster.w:raster.h)*.065))
   .map(line=>({...line,arrowDirection:Math.max(line.arrowAtEnd,line.arrowAtStart)>=3?(line.arrowAtEnd>=line.arrowAtStart?"forward":"backward"):"unknown"}));
