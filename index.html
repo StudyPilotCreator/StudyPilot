@@ -127,10 +127,10 @@ function normalizeVisualStructures(list){
   fileName:String(v.fileName||"Abbildung").slice(0,255),kind:String(v.kind||"image").slice(0,40),
   width:Math.max(0,Number(v.width)||0),height:Math.max(0,Number(v.height)||0),
   labels:(Array.isArray(v.labels)?v.labels:[]).filter(x=>x&&typeof x.text==="string").slice(0,80).map(x=>({text:x.text.slice(0,180),x:Math.max(0,Math.min(1,Number(x.x)||0)),y:Math.max(0,Math.min(1,Number(x.y)||0)),w:Math.max(0,Math.min(1,Number(x.w)||0)),h:Math.max(0,Math.min(1,Number(x.h)||0)),confidence:Math.max(0,Math.min(100,Number(x.confidence)||0))})),
-  lines:(Array.isArray(v.lines)?v.lines:[]).slice(0,80).map(x=>({id:String(x.id||"").slice(0,30),orientation:x.orientation==="vertical"?"vertical":"horizontal",x1:Math.max(0,Math.min(1,Number(x.x1)||0)),y1:Math.max(0,Math.min(1,Number(x.y1)||0)),x2:Math.max(0,Math.min(1,Number(x.x2)||0)),y2:Math.max(0,Math.min(1,Number(x.y2)||0)),length:Math.max(0,Math.min(1,Number(x.length)||0)),arrowDirection:["forward","backward"].includes(x.arrowDirection)?x.arrowDirection:"unknown"})),
+  lines:(Array.isArray(v.lines)?v.lines:[]).slice(0,80).map(x=>({id:String(x.id||"").slice(0,30),orientation:["vertical","shape"].includes(x.orientation)?x.orientation:"horizontal",x1:Math.max(0,Math.min(1,Number(x.x1)||0)),y1:Math.max(0,Math.min(1,Number(x.y1)||0)),x2:Math.max(0,Math.min(1,Number(x.x2)||0)),y2:Math.max(0,Math.min(1,Number(x.y2)||0)),length:Math.max(0,Math.min(1,Number(x.length)||0)),arrowDirection:["forward","backward"].includes(x.arrowDirection)?x.arrowDirection:"unknown"})),
   associations:(Array.isArray(v.associations)?v.associations:[]).slice(0,80).map(x=>({label:String(x.label||"").slice(0,180),lineId:String(x.lineId||"").slice(0,30),kind:String(x.kind||"near-line").slice(0,30),distance:Math.max(0,Math.min(1,Number(x.distance)||0)),confidence:Math.max(0,Math.min(1,Number(x.confidence)||0))})),
   connections:(Array.isArray(v.connections)?v.connections:[]).slice(0,40).map(x=>({from:String(x.from||"").slice(0,180),to:String(x.to||"").slice(0,180),kind:String(x.kind||"shared-line").slice(0,40),directionKnown:Boolean(x.directionKnown),confidence:Math.max(0,Math.min(1,Number(x.confidence)||0)),lineId:String(x.lineId||"").slice(0,30)})),
-  readingOrder:(Array.isArray(v.readingOrder)?v.readingOrder:[]).filter(x=>typeof x==="string").map(x=>x.slice(0,180)).slice(0,50),
+  readingOrder:(Array.isArray(v.readingOrder)?v.readingOrder:[]).filter(x=>typeof x==="string").map(x=>x.slice(0,180)).slice(0,50),readingOrderBasis:String(v.readingOrderBasis||"Position").slice(0,80),
   tables:(Array.isArray(v.tables)?v.tables:[]).slice(0,5).map(t=>({id:String(t.id||"table").slice(0,20),columns:Math.max(0,Number(t.columns)||0),confidence:Math.max(0,Math.min(1,Number(t.confidence)||0)),headerRow:Math.max(0,Number(t.headerRow)||0),rows:(Array.isArray(t.rows)?t.rows:[]).slice(0,25).map(row=>(Array.isArray(row)?row:[]).slice(0,12).map(cell=>String(cell||"").slice(0,300)))})),
   confidence:Math.max(0,Math.min(1,Number(v.confidence)||0)),notes:(Array.isArray(v.notes)?v.notes:[]).filter(x=>typeof x==="string").map(x=>x.slice(0,250)).slice(0,8)
  }));
@@ -816,6 +816,64 @@ function detectTableGrid(lines,wordBoxes,w,h){
  const occupied=rows.flat().filter(Boolean).length;
  return occupied? [{id:"table0",rows,columns:xs.length-1,confidence:Math.min(.96,.55+intersections.length/(hs.length*vs.length)*.35),headerRow:0}]:[];
 }
+function detectWhitespaceTable(wordBoxes,w,h){
+ const words=(wordBoxes||[]).filter(x=>String(x.text||"").trim()&&x.w>0&&x.h>0);
+ if(words.length<9)return [];
+ const heights=words.map(x=>x.h*h).sort((a,b)=>a-b),median=heights[Math.floor(heights.length/2)]||15,tolerance=Math.max(7,median*.75);
+ const rows=[];
+ for(const word of words.slice().sort((a,b)=>a.y-b.y||a.x-b.x)){
+  const cy=(word.y+word.h/2)*h;
+  let row=rows.find(r=>Math.abs(r.y-cy)<=tolerance);
+  if(!row){row={y:cy,items:[]};rows.push(row);}
+  row.items.push(word);row.y=row.items.reduce((sum,x)=>sum+(x.y+x.h/2)*h,0)/row.items.length;
+ }
+ const usable=rows.filter(r=>r.items.length>=2).sort((a,b)=>a.y-b.y);
+ if(usable.length<3)return [];
+ const gaps=[];
+ usable.forEach((row,rowIndex)=>{
+  const items=row.items.slice().sort((a,b)=>a.x-b.x);
+  for(let i=0;i<items.length-1;i++){
+   const left=items[i],right=items[i+1],gap=(right.x-(left.x+left.w))*w;
+   if(gap>=Math.max(22,w*.022))gaps.push({cut:(left.x+left.w+right.x)/2*w,rowIndex,gap});
+  }
+ });
+ const clusters=[];
+ for(const gap of gaps){
+  let group=clusters.find(x=>Math.abs(x.cut-gap.cut)<=Math.max(18,w*.025));
+  if(!group){group={cut:gap.cut,count:0,rows:new Set(),weight:0};clusters.push(group);}
+  group.cut=(group.cut*group.weight+gap.cut)/(group.weight+1);group.weight++;group.count++;group.rows.add(gap.rowIndex);
+ }
+ const cuts=clusters.filter(x=>x.rows.size>=Math.max(3,Math.ceil(usable.length*.55))).sort((a,b)=>a.cut-b.cut);
+ if(!cuts.length)return [];
+ const bounds=[0,...cuts.map(x=>x.cut/w),1],grid=usable.map(row=>Array.from({length:bounds.length-1},()=>[]));
+ usable.forEach((row,r)=>{
+  for(const word of row.items){
+   const cx=word.x+word.w/2,col=bounds.findIndex((v,i)=>i<bounds.length-1&&cx>=v&&cx<bounds[i+1]);
+   if(col>=0)grid[r][col].push(word);
+  }
+ });
+ const data=grid.map(row=>row.map(cell=>cell.sort((a,b)=>a.x-b.x).map(x=>x.text).join(" ").trim()));
+ const nonEmptyRows=data.filter(row=>row.filter(Boolean).length>=2);
+ if(nonEmptyRows.length<3)return [];
+ return [{id:"table-aligned",rows:data,columns:bounds.length-1,confidence:.52,headerRow:0,tableType:"aligned-columns"}];
+}
+function topologicalReadingOrder(labels,connections){
+ const directed=(connections||[]).filter(x=>x.directionKnown&&x.confidence>=.62);
+ if(!directed.length)return [];
+ const nodes=unique((labels||[]).map(x=>x.text)),edges=new Map(nodes.map(n=>[n,new Set()])),indegree=new Map(nodes.map(n=>[n,0]));
+ for(const edge of directed){
+  if(!edges.has(edge.from)||!edges.has(edge.to)||edges.get(edge.from).has(edge.to))continue;
+  edges.get(edge.from).add(edge.to);indegree.set(edge.to,(indegree.get(edge.to)||0)+1);
+ }
+ const positions=new Map((labels||[]).map(x=>[x.text,{x:x.x,y:x.y}]));
+ const queue=nodes.filter(n=>(indegree.get(n)||0)===0).sort((a,b)=>(positions.get(a).y-positions.get(b).y)||(positions.get(a).x-positions.get(b).x));
+ const order=[];
+ while(queue.length){
+  const node=queue.shift();order.push(node);
+  for(const next of edges.get(node)||[]){indegree.set(next,indegree.get(next)-1);if(indegree.get(next)===0){queue.push(next);queue.sort((a,b)=>(positions.get(a).y-positions.get(b).y)||(positions.get(a).x-positions.get(b).x));}}
+ }
+ return order.length>=2?order:[];
+}
 function analyzeVisualStructure(canvas,ocrData,fileName){
  const labels=extractOcrLineBoxes(ocrData,canvas.width,canvas.height);
  if(!labels.length)return {fileName,kind:"image",labels:[],lines:[],associations:[],connections:[],readingOrder:[],tables:[],confidence:.2,notes:["Keine zuverlässigen Textpositionen aus der OCR erhalten."]};
@@ -837,6 +895,8 @@ function analyzeVisualStructure(canvas,ocrData,fileName){
   }
   if(bestShape&&shapeDistance<=threshold*1.15)componentAssociations.push({label:label.text,shapeId:bestShape.id,distance:Math.round(shapeDistance),confidence:Math.max(.3,1-shapeDistance/(threshold*1.15))});
  });
+ const shapeLines=components.map(shape=>({id:shape.id,orientation:"shape",x1:shape.cx,y1:shape.cy,x2:shape.cx,y2:shape.cy,length:Math.max(shape.w,shape.h)}));
+ for(const association of componentAssociations)associations.push({label:association.label,lineId:association.shapeId,kind:"near-shape",distance:association.distance,confidence:association.confidence});
  const connections=[];
  for(const line of lines){
   const attached=associations.filter(a=>a.lineId===line.id).map(a=>a.label);
@@ -853,7 +913,7 @@ function analyzeVisualStructure(canvas,ocrData,fileName){
   const attached=unique(componentAssociations.filter(a=>a.shapeId===shape.id&&a.confidence>=.55).map(a=>a.label));
   if(attached.length>=2&&!connections.some(c=>attached.includes(c.from)&&attached.includes(c.to)))for(let i=0;i<attached.length-1;i++)connections.push({from:attached[i],to:attached[i+1],kind:"shared-drawn-shape",directionKnown:false,confidence:.52,shapeId:shape.id});
  }
- const tables=detectTableGrid(lines,wordBoxes,raster.w,raster.h);
+ const gridTables=detectTableGrid(lines,wordBoxes,raster.w,raster.h),tables=gridTables.length?gridTables:detectWhitespaceTable(wordBoxes,raster.w,raster.h);
  const orderedLabels=labels.map((label,index)=>({...label,index})).sort((a,b)=>a.y-b.y||a.x-b.x);
  const readingOrder=[];let row=[];
  for(const label of orderedLabels){
@@ -864,17 +924,18 @@ function analyzeVisualStructure(canvas,ocrData,fileName){
  }
  row.sort((a,b)=>a.x-b.x).forEach(x=>readingOrder.push(x.text));
  const arrowConnections=connections.filter(x=>x.directionKnown&&x.confidence>=.65);
+ const flowOrder=topologicalReadingOrder(labels,arrowConnections),finalReadingOrder=flowOrder.length?flowOrder:readingOrder,readingOrderBasis=flowOrder.length?"Pfeilrichtungen (geschätzt)":"Position: oben nach unten, links nach rechts";
  const tableQuality=tables.length?Math.max(...tables.map(t=>t.confidence)):0;
  const confidence=Math.min(.96,.28+(labels.length?Math.min(.24,labels.length*.015):0)+(lines.length?Math.min(.2,lines.length*.012):0)+(connections.length?Math.min(.16,connections.length*.04):0)+tableQuality*.2);
  const output={
   fileName:String(fileName||"Bild").slice(0,255),kind:tables.length?"table-and-diagram":lines.length||components.length?"diagram":"text-with-layout",
-  width:canvas.width,height:canvas.height,labels:labels.slice(0,80),lines:lines.slice(0,80).map(l=>({id:l.id,orientation:l.orientation,x1:l.x1/raster.w,y1:l.y1/raster.h,x2:l.x2/raster.w,y2:l.y2/raster.h,length:l.length/Math.max(raster.w,raster.h),arrowDirection:l.arrowDirection})),
-  associations:associations.slice(0,80).map(a=>({...a,distance:a.distance/Math.max(raster.w,raster.h)})),
-  connections:connections.slice(0,40),readingOrder:readingOrder.slice(0,50),tables,confidence,notes:[
+  width:canvas.width,height:canvas.height,labels:labels.slice(0,80),lines:lines.concat(shapeLines).slice(0,100).map(l=>({id:l.id,orientation:l.orientation,x1:l.x1/raster.w,y1:l.y1/raster.h,x2:l.x2/raster.w,y2:l.y2/raster.h,length:l.length/Math.max(raster.w,raster.h),arrowDirection:l.arrowDirection||"unknown"})),
+  associations:associations.slice(0,100).map(a=>({...a,distance:a.distance/Math.max(raster.w,raster.h)})),
+  connections:connections.slice(0,40),readingOrder:finalReadingOrder.slice(0,50),readingOrderBasis,tables,confidence,notes:[
    lines.length?"Gerade Linien und Liniennähe wurden geometrisch ausgewertet.":"",
    connections.length?"Verbindungen beruhen auf gemeinsam erkannten Linien oder Zeichnungskomponenten.":"",
-   tables.length?"Eine mögliche Tabellenstruktur wurde aus horizontalen und vertikalen Linien abgeleitet.":"",
-   arrowConnections.length?"Pfeilrichtungen wurden an Linienenden heuristisch erkannt.":"Die Richtung einer Verbindung ist nicht sicher erkennbar; die Reihenfolge ist geometrisch geschätzt."
+   tables.length?(tables[0].tableType==="aligned-columns"?"Tabellenspalten wurden über wiederkehrende Wortabstände geschätzt.":"Eine mögliche Tabellenstruktur wurde aus horizontalen und vertikalen Linien abgeleitet."):"",
+   arrowConnections.length?"Pfeilrichtungen wurden an Linienenden heuristisch erkannt.":"Die Leserichtung ist geometrisch geschätzt und nicht als Pfeilfolge bestätigt."
   ].filter(Boolean)
  };
  raster.canvas.width=1;raster.canvas.height=1;
