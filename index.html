@@ -291,7 +291,7 @@ function topicScore(sentence,topic){
  return score;
 }
 function bestFacts(text,topic,limit=6){
- const sentences=unique(splitSentences(text)).filter(s=>s.length>=28&&s.length<=420&&(s.match(/\S+/g)||[]).length>=5);
+ const sentences=unique(splitSentences(text)).filter(s=>s.length>=22&&s.length<=420&&(s.match(/\S+/g)||[]).length>=3);
  const matching=topic?sentences.filter(s=>topicScore(s,topic)>0):sentences;
  if(topic&&!matching.length)return [];
  const ranked=matching.map((s,i)=>{
@@ -386,7 +386,7 @@ function extractCauseQuestion(sentence){
  return null;
 }
 function makeCards(text,title,set,tId,settings){
- const facts=unique(bestFacts(text,title,Math.max(settings.cardLimit*2,12)).map(cleanSourceText).filter(s=>s.length>=28)),out=[],used=new Set();
+ const facts=unique(bestFacts(text,title,Math.max(settings.cardLimit*2,12)).map(cleanSourceText).filter(s=>s.length>=22)),out=[],used=new Set();
  for(const s of facts){
   if(out.length>=settings.cardLimit)break;
   const year=s.match(/\b(1[89]\d{2}|20\d{2})\b/),def=parseDefinition(s),cause=extractCauseQuestion(s),fact=extractFactQuestion(s);
