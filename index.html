@@ -191,7 +191,7 @@ function getTopic(s,id){return s&&s.topics.find(t=>String(t.id)===String(id));}
 function renderSet(){
  const s=getSet(setId);if(!s){view="library";return renderLibrary();}
  const hasMaterial=String(s.content||"").trim().length>=25,cards=s.topics.reduce((n,t)=>n+t.cards.length,0),questions=s.topics.reduce((n,t)=>n+t.questions.length,0),stats=data.quizStats[s.id]||{played:0};
- return '<section class="view"><button class="back-link" data-action="set-back">← '+esc(s.subject)+'</button><section class="hero glass"><div class="eyebrow">'+esc(s.subject)+' · '+esc(s.exam)+'</div><h1>'+esc(s.title)+'</h1><p>'+(hasMaterial?'Deine Inhalte sind in Themen sortiert. Lies den Überblick, übe Karteikarten und teste dein Wissen.':'Deine Themenübersicht ist gespeichert. Ergänze jetzt deine Lerninhalte, damit daraus Zusammenfassungen, Karteikarten und Quizfragen entstehen.')+'</p><div class="hero-actions">'+(hasMaterial?'<button class="btn primary" data-action="start-quiz" data-set-id="'+esc(s.id)+'">🎯 Komplettquiz starten</button><button class="btn" data-action="start-cards" data-set-id="'+esc(s.id)+'">🗂️ Alle Karteikarten</button>':'')+'<button class="btn mint" data-action="edit-material" data-id="'+esc(s.id)+'">'+(hasMaterial?'Material bearbeiten':'＋ Lernmaterial hinzufügen')+'</button><button class="btn danger" data-action="delete-set" data-id="'+esc(s.id)+'">Lernset löschen</button></div></section>'+(hasMaterial?'':'<section class="panel glass" style="margin:14px 0;border-color:#ffd48a55"><strong>✓ Themenliste gespeichert</strong><p class="small-text" style="line-height:1.7;margin:7px 0 0">Jetzt fehlt noch der eigentliche Lernstoff. Füge Schulbuchseiten, Arbeitsblätter oder Mitschriften hinzu. StudyPilot erfindet keine Antworten.</p></section>')+'<div class="stats"><div class="stat"><div class="stat-icon">🧩</div><div class="stat-number">'+s.topics.length+'</div><div class="stat-label">Themen</div></div><div class="stat"><div class="stat-icon">🗂️</div><div class="stat-number">'+cards+'</div><div class="stat-label">Karteikarten</div></div><div class="stat"><div class="stat-icon">🎯</div><div class="stat-number">'+stats.played+'</div><div class="stat-label">Quiz-Runden</div></div></div><div class="section-row"><h2>Themenübersicht</h2><span class="small-text">'+questions+' Quizfragen insgesamt</span></div><div class="topic-grid">'+s.topics.map(t=>'<article class="topic-card"><div class="topic-title">'+esc(t.title)+'</div><div class="topic-snippet">'+esc(t.summary.slice(0,2).join(" "))+'</div>'+(t.matchMode==="general"?'<div style="margin-top:8px"><span class="badge yellow">Material nicht eindeutig zugeordnet – bitte prüfen</span></div>':'')+'<div class="topic-actions"><button class="btn small" data-action="open-topic" data-topic-id="'+esc(t.id)+'">Überblick →</button><button class="btn small" data-action="topic-quiz" data-topic-id="'+esc(t.id)+'">Quiz</button></div></article>').join("")+'</div><section class="panel glass" style="margin-top:15px"><div class="panel-head"><h2>Materialien</h2><span class="badge">'+s.documents.length+' Dateien</span></div><div class="simple-list">'+(s.documents.map(d=>'<div class="simple-row"><div class="simple-row-icon">'+(d.toLowerCase().endsWith(".pdf")?"📄":d.match(/\.txt$/i)?"📝":"🖼️")+'</div><div class="simple-row-main"><div class="simple-row-title">'+esc(d)+'</div><div class="simple-row-meta">Ausgelesen und verarbeitet</div></div></div>').join("")||'<div class="small-text">Aus eingefügtem Text erstellt.</div>')+'</div><div class="form-note" style="margin-top:14px">Gespeichert werden der erkannte Text und deine Lernmaterialien, nicht die Originaldatei. Du kannst den Text jederzeit bearbeiten und neu aufbereiten.</div></section></section>';
+ return '<section class="view"><button class="back-link" data-action="set-back">← '+esc(s.subject)+'</button><section class="hero glass"><div class="eyebrow">'+esc(s.subject)+' · '+esc(s.exam)+'</div><h1>'+esc(s.title)+'</h1><p>'+(hasMaterial?'Deine Inhalte sind in Themen sortiert. Lies den Überblick, übe Karteikarten und teste dein Wissen.':'Deine Themenübersicht ist gespeichert. Ergänze jetzt deine Lerninhalte, damit daraus Zusammenfassungen, Karteikarten und Quizfragen entstehen.')+'</p><div class="hero-actions">'+(hasMaterial?'<button class="btn primary" data-action="start-quiz" data-set-id="'+esc(s.id)+'">🎯 Komplettquiz starten</button><button class="btn" data-action="start-cards" data-set-id="'+esc(s.id)+'">🗂️ Alle Karteikarten</button>':'')+'<button class="btn mint" data-action="edit-material" data-id="'+esc(s.id)+'">'+(hasMaterial?'Material bearbeiten':'＋ Lernmaterial hinzufügen')+'</button><button class="btn danger" data-action="delete-set" data-id="'+esc(s.id)+'">Lernset löschen</button></div></section>'+(hasMaterial?'':'<section class="panel glass" style="margin:14px 0;border-color:#ffd48a55"><strong>✓ Themenliste gespeichert</strong><p class="small-text" style="line-height:1.7;margin:7px 0 0">Jetzt fehlt noch der eigentliche Lernstoff. Füge Schulbuchseiten, Arbeitsblätter oder Mitschriften hinzu. StudyPilot erfindet keine Antworten.</p></section>')+'<div class="stats"><div class="stat"><div class="stat-icon">🧩</div><div class="stat-number">'+s.topics.length+'</div><div class="stat-label">Themen</div></div><div class="stat"><div class="stat-icon">🗂️</div><div class="stat-number">'+cards+'</div><div class="stat-label">Karteikarten</div></div><div class="stat"><div class="stat-icon">🎯</div><div class="stat-number">'+stats.played+'</div><div class="stat-label">Quiz-Runden</div></div></div><div class="section-row"><h2>Themenübersicht</h2><span class="small-text">'+questions+' Quizfragen insgesamt</span></div><div class="topic-grid">'+s.topics.map(t=>'<article class="topic-card"><div class="topic-title">'+esc(t.title)+'</div><div class="topic-snippet">'+esc(t.summary.slice(0,2).join(" "))+'</div>'+(t.matchMode==="general"||t.matchMode==="unmatched"?'<div style="margin-top:8px"><span class="badge yellow">'+(t.matchMode==="unmatched"?'Keine passenden Textstellen gefunden – Zuordnung prüfen':'Material nicht eindeutig zugeordnet – bitte prüfen')+'</span></div>':'')+'<div class="topic-actions"><button class="btn small" data-action="open-topic" data-topic-id="'+esc(t.id)+'">Überblick →</button><button class="btn small" data-action="topic-quiz" data-topic-id="'+esc(t.id)+'">Quiz</button></div></article>').join("")+'</div><section class="panel glass" style="margin-top:15px"><div class="panel-head"><h2>Materialien</h2><span class="badge">'+s.documents.length+' Dateien</span></div><div class="simple-list">'+(s.documents.map(d=>'<div class="simple-row"><div class="simple-row-icon">'+(d.toLowerCase().endsWith(".pdf")?"📄":d.match(/\.txt$/i)?"📝":"🖼️")+'</div><div class="simple-row-main"><div class="simple-row-title">'+esc(d)+'</div><div class="simple-row-meta">Ausgelesen und verarbeitet</div></div></div>').join("")||'<div class="small-text">Aus eingefügtem Text erstellt.</div>')+'</div><div class="form-note" style="margin-top:14px">Gespeichert werden der erkannte Text und deine Lernmaterialien, nicht die Originaldatei. Du kannst den Text jederzeit bearbeiten und neu aufbereiten.</div></section></section>';
 }
 function renderTopic(){
  const s=getSet(setId),t=getTopic(s,topicId);if(!s||!t){view="set";return renderSet();}
@@ -267,35 +267,52 @@ function parseTopicList(raw){
 function chooseTopics(text,title,input){const p=parseTopicList(input).slice(0,12);if(p.length)return p;const h=parseTopicList(text).filter(x=>(x.match(/\s+/g)||[]).length<=7).slice(0,8);return h.length>=2?h:[String(title||"Gesamtüberblick")];}
 function topicScore(sentence,topic){
  const s=String(sentence||"").toLocaleLowerCase("de"),t=String(topic||"").toLocaleLowerCase("de");
- const ignored=new Set(["und","oder","der","die","das","den","dem","des","ein","eine","einer","eines","einem","einen","mit","von","für","zum","zur","über","unter","the","and","aus","bei","wie","leben","regiert","regieren","thema","krieg","weltkrieg"]);
- const words=t.split(/[^a-zäöüß0-9]+/).filter(w=>w.length>=3&&!ignored.has(w));
+ if(!s||!t)return 0;
  const has=raw=>new RegExp("(^|[^a-zäöüß0-9])"+escRegex(String(raw).toLocaleLowerCase("de"))+"(?:e|en|er|es|em|ern|n|s)?([^a-zäöüß0-9]|$)","i").test(s);
- const wordMatches=words.reduce((n,w)=>n+(has(w)?1:0),0);
- let score=wordMatches;
- if(/weltkrieg/.test(t)&&has("weltkrieg"))score+=5;
- if(/zweiter weltkrieg/.test(t)&&/zweite[rn]? weltkrieg/.test(s))score+=2;
+ let score=s.includes(t)?5:0;
+ const ignored=new Set(["und","oder","der","die","das","den","dem","des","ein","eine","einer","eines","einem","einen","mit","von","für","zum","zur","über","unter","the","and","aus","bei","wie","im","in","am","an","auf","nach","vor","seit","durch","was","war","ist","sind","wurde","werden","lebte","leben"]);
+ const words=t.split(/[^a-zäöüß0-9]+/).filter(w=>w.length>=3&&!ignored.has(w));
+ for(const word of words)if(has(word))score+=2;
  const aliases=[
-  [/klosterleben|kloster|mönch|nonne|abt/,["kloster","klöster","mönch","nonne","abt","gebet","beteten","schreiben","handschrift"]],
-  [/könig|herrschaft|regier|mittelalterlicher herrscher/,["könig","könige","herrscher","reich","lehen","vasallen","vasall","treue","herrschaft","regierte","regierten","entscheidung"]],
+  [/zweiter weltkrieg|weltkrieg|kriegseintritt|kriegsende/,["polen","1939","1945","alliierten","hitler","ns-regime","pearl harbor","usa","sowjetunion","kapitulation","besetzung","invasion"]],
+  [/usa|vereinigte staaten|kriegseintritt|pearl harbor/,["usa","vereinigte staaten","pearl harbor","1941","japan","angriff","traten in den krieg"]],
+  [/klosterleben|kloster|mönch|nonne|abt/,["kloster","klöster","mönch","nonne","abt","gebet","handschrift","schreiben"]],
+  [/könig|herrschaft|regier|mittelalterlicher herrscher/,["könig","könige","herrscher","reich","lehen","vasallen","vasall","treue","herrschaft","regierte","regierten"]],
   [/ständegesellschaft|stände|gesellschaft/,["stand","stände","adel","klerus","bauer","bauern","geistliche","freie","unfreie"]],
-  [/ritter|burg|burgen/,["ritter","burg","burgen","burggraben","lehen","vasall","ritter"]],
-  [/leben auf dem land|bauer|landwirtschaft/,["bauer","bauern","feld","felder","grundherr","abgaben","abgabe","ernte","land","acker"]],
-  [/weltkrieg|krieg/,["deutschland","polen","alliierten","kapitulation","kriegsende","überfall","invasion","besetzung","besetzten","besatzung","front","endete","niederlage","sieg"]],
-  [/beginn|ausbruch|start/,["begann","beginnt","ausbruch","überfall","invasion","ausgelöst"]],
-  [/kriegseintritt|usa|vereinigte staaten|pearl harbor/,["usa","vereinigte staaten","pearl harbor","traten","trat","angriff","kriegseintritt"]],
-  [/ende|kapitulation|kriegsende|niederlage/,["endete","kapitulation","beendete","sieg","niederlage"]],
-  [/ursach|grund|auslöser/,["ursache","ursachen","grund","auslöser","aufgrund","deshalb","führte zu"]],
-  [/folgen|auswirkung|konsequenz/,["folge","folgen","auswirkung","wiederaufbau","verlust","veränderung"]],
+  [/ritter|burg|burgen/,["ritter","burg","burgen","burggraben","lehen","vasall"]],
+  [/leben auf dem land|bauer|landwirtschaft/,["bauer","bauern","feld","felder","grundherr","abgaben","abgabe","ernte","acker"]],
+  [/ursach|grund|auslöser/,["ursache","ursachen","grund","auslöser","aufgrund","deshalb","führte zu","verursachte"]],
+  [/folgen|auswirkung|konsequenz/,["folge","folgen","auswirkung","wiederaufbau","verlust","veränderung","führte zu"]],
   [/fried|vertrag|abkommen/,["frieden","vertrag","abkommen","unterzeichnet","gründeten"]]
  ];
- for(const [pattern,aliasTerms] of aliases){if(pattern.test(t))score+=aliasTerms.reduce((n,w)=>n+(has(w)?2:0),0);}
+ for(const [pattern,wordsForTopic] of aliases)if(pattern.test(t)){
+  for(const word of wordsForTopic)if(has(word))score+=2;
+ }
  return score;
 }
-function bestFacts(text,topic){
- const sentences=splitSentences(text),matching=topic?sentences.filter(s=>topicScore(s,topic)>0):sentences;
- const a=matching.length?matching:sentences;
- const rank=a.map((s,i)=>({s,i,score:(/\b(19\d{2}|20\d{2})\b/.test(s)?3:0)+(/\b(weil|deshalb|dadurch|folglich|daher|führte|verursachte|bedeutet|ist|war)\b/i.test(s)?2:0)+(s.length>60&&s.length<260?2:0)})).sort((x,y)=>y.score-x.score||x.i-y.i);
- return rank.length?rank.slice(0,6).map(x=>x.s):String(text||"").trim()?[String(text).trim().slice(0,280)]:[];
+function bestFacts(text,topic,limit=6){
+ const sentences=unique(splitSentences(text)).filter(s=>s.length>=28&&s.length<=420&&(s.match(/\S+/g)||[]).length>=5);
+ const matching=topic?sentences.filter(s=>topicScore(s,topic)>0):sentences;
+ if(topic&&!matching.length)return [];
+ const ranked=matching.map((s,i)=>{
+  const words=s.match(/\S+/g)||[];
+  const years=(s.match(/\b(?:18|19|20)\d{2}\b/g)||[]).length;
+  const score=(years?4:0)+(/\b(ist|sind|bedeutet|bezeichnet|heißt)\b/i.test(s)?3:0)+(/\b(weil|deshalb|dadurch|folglich|daher|führte zu|verursachte|infolge)\b/i.test(s)?3:0)+(/\b(wichtig|insbesondere|vor allem|zum beispiel)\b/i.test(s)?1:0)+(s.length>=55&&s.length<=260?2:0)+(words.length>=8&&words.length<=35?1:0)+(/[.!?]$/.test(s)?1:0);
+  return {s,i,score};
+ }).sort((a,b)=>b.score-a.score||a.i-b.i);
+ const chosen=[],signatures=[];
+ for(const item of ranked){
+  const tokens=new Set(item.s.toLocaleLowerCase("de").replace(/[^\p{L}\p{N}\s]/gu," ").split(/\s+/).filter(w=>w.length>2));
+  const tooSimilar=signatures.some(other=>{
+   let overlap=0;for(const token of tokens)if(other.has(token))overlap++;
+   const union=tokens.size+other.size-overlap;
+   return union>0&&overlap/union>0.78;
+  });
+  if(tooSimilar)continue;
+  chosen.push(item);signatures.push(tokens);
+  if(chosen.length>=Math.max(1,limit))break;
+ }
+ return chosen.sort((a,b)=>a.i-b.i).map(x=>x.s);
 }
 function levelSettings(grade,difficulty){
  const g=Number(grade)||8,mode=difficulty&&difficulty!=="Automatisch"?difficulty:(g<=4?"Einfach":g<=9?"Mittel":"Anspruchsvoll");
@@ -350,19 +367,45 @@ function extractFactQuestion(sentence){
  }
  return null;
 }
-function makeCards(text,title,set,tId,settings){
- const facts=unique(bestFacts(text,title).map(cleanSourceText).filter(s=>s.length>=24)),out=[];
- facts.forEach((s,i)=>{
-  const year=s.match(/\b(1[89]\d{2}|20\d{2})\b/),def=parseDefinition(s),fact=extractFactQuestion(s);
-  let q=settings.grade<=5?"Was ist wichtig zum Thema „"+title+"“?":"Was sagt das Material über „"+title+"“?",a=s;
-  if(year){q="Welche Jahreszahl nennt das Material für diese Aussage?\n"+s.replace(year[0],"_____");a=year[0];}
-  else if(def){q="Was versteht man unter „"+def.term+"“?";a=def.definition.replace(/[.!?]+$/,"");}
-  else if(fact){q=fact.prompt;a=fact.answer;}
-  else if(i>0)q="Nenne einen weiteren wichtigen Fakt zum Thema „"+title+"“.";
-  out.push({id:set+"-"+tId+"-c"+i,question:q,answer:a,source:s});
+function findClozeTarget(sentence,title){
+ const titleWords=new Set(String(title||"").toLocaleLowerCase("de").split(/[^a-zäöüß0-9]+/).filter(w=>w.length>2));
+ const ignored=new Set(["der","die","das","den","dem","des","ein","eine","einer","eines","einem","einen","und","oder","aber","dann","dort","hier","diese","dieser","dieses","the","a","an"]);
+ const candidates=terms(sentence).map(raw=>String(raw).replace(/^(?:der|die|das|den|dem|des|ein|eine|einer|eines|einem|einen|the|a|an)\s+/i,"").trim()).filter(candidate=>{
+  const words=candidate.split(/\s+/);
+  const key=candidate.toLocaleLowerCase("de");
+  return candidate.length>=3&&candidate.length<=55&&words.length<=4&&!ignored.has(key)&&!words.every(w=>titleWords.has(w.toLocaleLowerCase("de")))&&sentence.toLocaleLowerCase("de").indexOf(key)>0;
  });
- if(!out.length&&String(text||"").trim())out.push({id:set+"-"+tId+"-c0",question:"Was weißt du über „"+title+"“?",answer:cleanSourceText(text).slice(0,500),source:cleanSourceText(text).slice(0,500)});
- return out.slice(0,settings.cardLimit);
+ candidates.sort((a,b)=>(b.split(/\s+/).length*12+b.length)-(a.split(/\s+/).length*12+a.length));
+ return candidates[0]||"";
+}
+function extractCauseQuestion(sentence){
+ let m=sentence.match(/^(.{6,140}?)\s+(führte zu|verursachte|löste aus|hatte zur Folge)\s+(.{5,160})$/i);
+ if(m)return {prompt:"Welche Folge hatte "+m[1].trim()+"?",answer:m[3].replace(/[.!?]+$/,""),source:sentence};
+ m=sentence.match(/^(.{6,140}?)\s+(war der Grund für|war der Auslöser für)\s+(.{5,160})$/i);
+ if(m)return {prompt:"Was war laut Material der Grund für "+m[3].replace(/[.!?]+$/,"")+"?",answer:m[1].trim(),source:sentence};
+ return null;
+}
+function makeCards(text,title,set,tId,settings){
+ const facts=unique(bestFacts(text,title,Math.max(settings.cardLimit*2,12)).map(cleanSourceText).filter(s=>s.length>=28)),out=[],used=new Set();
+ for(const s of facts){
+  if(out.length>=settings.cardLimit)break;
+  const year=s.match(/\b(1[89]\d{2}|20\d{2})\b/),def=parseDefinition(s),cause=extractCauseQuestion(s),fact=extractFactQuestion(s);
+  let question="",answer="";
+  if(year){question="Ergänze die fehlende Jahreszahl:\n"+s.replace(year[0],"_____");answer=year[0];}
+  else if(def){question="Was bedeutet „"+def.term+"“?";answer=def.definition.replace(/[.!?]+$/,"");}
+  else if(cause){question=cause.prompt;answer=cause.answer;}
+  else if(fact&&fact.type!=="when"){question=fact.prompt;answer=fact.answer;}
+  else{
+   const target=findClozeTarget(s,title);
+   if(target){question="Ergänze den fehlenden Begriff:\n"+s.replace(new RegExp(escRegex(target),"i"),"_____");answer=target;}
+  }
+  if(!question||!answer||answer.length>260)continue;
+  const key=question.toLocaleLowerCase("de").replace(/\s+/g," ").trim();
+  if(used.has(key))continue;
+  used.add(key);
+  out.push({id:set+"-"+tId+"-c"+out.length,question,answer,source:s});
+ }
+ return out;
 }
 function makeFalseStatement(sentence,termList,allYears){
  const years=allYears||[],year=sentence.match(/\b(?:18|19|20)\d{2}\b/);
@@ -396,56 +439,52 @@ function makeFalseStatement(sentence,termList,allYears){
 }
 
 function makeQuiz(text,title,set,tId,settings){
- const source=cleanSourceText(text),years=unique((source.match(/\b(?:18|19|20)\d{2}\b/g)||[])),limit=settings.quizLimit,out=[],usedSentences=new Set();
- const sentencePool=unique(splitSentences(source)).filter(s=>s.length>=24&&s.length<=340&&(s.match(/\S+/g)||[]).length>=5),matching=sentencePool.filter(s=>topicScore(s,title)>0);
- const facts=(matching.length?matching:sentencePool).slice(0,Math.max(limit*2,20));
+ const source=cleanSourceText(text),years=unique((source.match(/\b(?:18|19|20)\d{2}\b/g)||[])),limit=settings.quizLimit,out=[],used=new Set();
+ const facts=bestFacts(source,title,Math.max(limit*3,18));
  for(const s of facts){
   if(out.length>=limit)break;
-  const year=s.match(/\b(?:18|19|20)\d{2}\b/);if(!year)continue;
-  const n=Number(year[0]),pool=unique(years.filter(x=>x!==year[0]).concat([n-1,n+1,n+2,n+5].map(String))).filter(x=>x!==year[0]);
-  const opts=optionsFor(year[0],pool);
-  if(opts.length<2)continue;
-  out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Welche Jahreszahl gehört in die Lücke?\n"+s.replace(year[0],"_____"),options:opts,correctIndex:opts.indexOf(year[0]),explanation:"Im Material steht: "+s,topicTitle:title});
-  usedSentences.add(s);
+  const year=s.match(/\b(?:18|19|20)\d{2}\b/);if(!year||used.has(s))continue;
+  const n=Number(year[0]),pool=unique(years.filter(x=>x!==year[0]).concat([n-1,n+1,n+2,n+5,n-5].map(String))).filter(x=>x!==year[0]);
+  const opts=optionsFor(year[0],pool);if(opts.length<2)continue;
+  out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Welche Jahreszahl passt zur Aussage?\n"+s.replace(year[0],"_____"),options:opts,correctIndex:opts.indexOf(year[0]),explanation:"Im Material steht: "+s,topicTitle:title});
+  used.add(s);
  }
  const definitions=unique(facts.map(s=>({source:s,definition:parseDefinition(s)})).filter(x=>x.definition).map(x=>({...x,key:x.definition.term.toLocaleLowerCase("de")})).filter((x,i,a)=>a.findIndex(y=>y.key===x.key)===i));
- if(definitions.length>=2){
-  for(const item of definitions){
-   if(out.length>=limit)break;
-   const otherTerms=definitions.filter(d=>d.key!==item.key).map(d=>d.definition.term),opts=optionsFor(item.definition.term,otherTerms);
-   if(opts.length<2)continue;
-   out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Welcher Begriff passt zu dieser Beschreibung?\n"+item.definition.definition,options:opts,correctIndex:opts.indexOf(item.definition.term),explanation:"Im Material wird „"+item.definition.term+"“ so beschrieben: "+item.definition.definition,topicTitle:title});
-   usedSentences.add(item.source);
-  }
+ for(const item of definitions){
+  if(out.length>=limit)break;
+  const otherTerms=definitions.filter(d=>d.key!==item.key).map(d=>d.definition.term),opts=optionsFor(item.definition.term,otherTerms);
+  if(opts.length<2)continue;
+  out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Welcher Begriff passt zu dieser Beschreibung?\n"+item.definition.definition,options:opts,correctIndex:opts.indexOf(item.definition.term),explanation:"Im Material wird „"+item.definition.term+"“ so beschrieben: "+item.definition.definition,topicTitle:title});
+  used.add(item.source);
  }
  const factQuestions=facts.map(s=>extractFactQuestion(s)).filter(Boolean);
  for(const item of factQuestions){
   if(out.length>=limit)break;
-  if(usedSentences.has(item.source))continue;
+  if(used.has(item.source))continue;
   const pool=factQuestions.filter(other=>other.type===item.type&&other.source!==item.source).map(other=>other.answer);
-  const opts=optionsFor(item.answer,pool);
-  if(opts.length<2)continue;
+  const opts=optionsFor(item.answer,pool);if(opts.length<2)continue;
   out.push({id:set+"-"+tId+"-q"+out.length,prompt:item.prompt,options:opts,correctIndex:opts.indexOf(item.answer),explanation:"Im Material steht: "+item.source,topicTitle:title});
-  usedSentences.add(item.source);
+  used.add(item.source);
  }
- let candidateIndex=0;
  for(const s of facts){
   if(out.length>=limit)break;
-  if(usedSentences.has(s))continue;
-  const falseText=makeFalseStatement(s,[],years);if(!falseText)continue;
-  const useFalse=candidateIndex%2===0,statement=useFalse?falseText:s;
-  out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Prüfe die Aussage anhand deiner Unterlagen.\n"+statement,options:["Richtig","Falsch"],correctIndex:useFalse?1:0,explanation:useFalse?"Im Material steht stattdessen: "+s:"Diese Aussage wurde direkt aus dem Material übernommen: "+s,topicTitle:title});
-  candidateIndex++;usedSentences.add(s);
+  if(used.has(s))continue;
+  const match=s.match(/\b(1[89]\d{2}|20\d{2})\b/);if(!match)continue;
+  const n=Number(match[0]),wrong=[n+1,n-1,n+2,n-2,n+5].map(String).find(x=>!years.includes(x)&&x!==match[0]);
+  if(!wrong)continue;
+  const statement=s.replace(match[0],wrong);
+  out.push({id:set+"-"+tId+"-q"+out.length,prompt:"Ist diese Aussage laut Material richtig oder falsch?\n"+statement,options:["Richtig","Falsch"],correctIndex:1,explanation:"Im Material steht stattdessen: "+s,topicTitle:title});
+  used.add(s);
  }
  return out.slice(0,limit);
 }
 function makeSet(input){
- const source=cleanSourceText(input.text),id=uid(),names=chooseTopics(source,input.title,input.topicInput),sentences=splitSentences(source),settings=levelSettings(input.grade,input.difficulty);
+ const source=cleanSourceText(input.text),id=uid(),names=chooseTopics(source,input.title,input.topicInput),sentences=splitSentences(source),settings=levelSettings(input.grade,input.difficulty),multiTopic=names.length>1;
  const topics=names.map((title,i)=>{
-  const matching=sentences.filter(s=>topicScore(s,title)>0),useMatched=matching.length>0;
-  let content=useMatched?matching.join(" "):source;
-  if(!content)content=source;
-  return {id:uid(),title,summary:bestFacts(content,title).slice(0,settings.summaryLimit),cards:makeCards(content,title,id,"t"+i,settings),questions:makeQuiz(content,title,id,"t"+i,settings),sourceText:content,matchMode:useMatched?"matched":"general"};
+  const matching=sentences.filter(s=>topicScore(s,title)>0),hasMatch=matching.length>0;
+  const content=hasMatch?matching.join(" "):(multiTopic?"":source);
+  const summary=content?bestFacts(content,title,settings.summaryLimit):[];
+  return {id:uid(),title,summary,cards:makeCards(content,title,id,"t"+i,settings),questions:makeQuiz(content,title,id,"t"+i,settings),sourceText:content,matchMode:hasMatch?"matched":(multiTopic?"unmatched":"general")};
  });
  return {id,title:input.title,subject:input.subject,exam:input.exam,grade:settings.grade,difficulty:settings.level,topicNames:names,content:source.slice(0,120000),documents:input.documents||[],topics,createdAt:new Date().toISOString()};
 }
