@@ -42,7 +42,8 @@ h1{font-size:clamp(34px,10vw,46px);line-height:1.04;letter-spacing:-1.6px;margin
 </main>
 <script>
 const $=id=>document.getElementById(id);
-// When this mobile page is served by ClipPilot on the Mac, prefill its origin for same-origin requests.\nif(location.protocol==='http:'&&location.port==='8765'&&!location.hostname.endsWith('github.io'))$('server').value=location.origin;
+// When this mobile page is served by ClipPilot on the Mac, prefill its origin for same-origin requests.
+if(location.protocol==='http:'&&location.port==='8765'&&!location.hostname.endsWith('github.io'))$('server').value=location.origin;
 function setStatus(msg,err=false){$('status').textContent=msg;$('status').classList.toggle('error',err)}
 function validVideoLink(value){try{const u=new URL(value);return ['youtube.com','www.youtube.com','youtu.be','m.youtube.com','twitch.tv','www.twitch.tv','clips.twitch.tv'].some(host=>u.hostname===host||u.hostname.endsWith('.'+host))}catch{return false}}
 $('go').addEventListener('click',async()=>{
