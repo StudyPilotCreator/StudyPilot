@@ -31,7 +31,7 @@ h1{font-size:clamp(34px,10vw,46px);line-height:1.04;letter-spacing:-1.6px;margin
 <div class="section"><div class="steps"><span class="stepdot">3</span><b>Verarbeitung verbinden</b></div>
 <label class="label" for="server">ClipPilot-Server-Adresse</label><input id="server" class="input" placeholder="http://Mac-IP:8765" inputmode="url" autocomplete="url">
 <div class="section"><label class="label" for="token">Verbindungstoken</label><input id="token" class="input" type="password" placeholder="Token aus ClipPilot-Terminal"></div>
-<p class="helper">Die mobile Website ist bereit. Für die Verarbeitung muss der ClipPilot-Rechner online sein und erreichbar bleiben. Die Zugangsdaten werden nur in dieser Browser-Sitzung verwendet.</p>
+<p class="helper">Wenn du die Seite direkt über den Mac öffnest (http://Mac-IP:8765/mobile), wird die Server-Adresse automatisch vorausgefüllt. Für Verarbeitung muss der ClipPilot-Rechner online sein. Zugangsdaten bleiben in den Feldern dieser Sitzung.</p>
 <button id="go" class="btn">✦ Highlights erstellen</button>
 <div id="status" class="status">Bereit. Link und Server-Verbindung eintragen.</div>
 <div id="results"></div>
@@ -42,6 +42,7 @@ h1{font-size:clamp(34px,10vw,46px);line-height:1.04;letter-spacing:-1.6px;margin
 </main>
 <script>
 const $=id=>document.getElementById(id);
+// When this mobile page is served by ClipPilot on the Mac, prefill its origin for same-origin requests.\nif(location.protocol==='http:'&&location.port==='8765'&&!location.hostname.endsWith('github.io'))$('server').value=location.origin;
 function setStatus(msg,err=false){$('status').textContent=msg;$('status').classList.toggle('error',err)}
 function validVideoLink(value){try{const u=new URL(value);return ['youtube.com','www.youtube.com','youtu.be','m.youtube.com','twitch.tv','www.twitch.tv','clips.twitch.tv'].some(host=>u.hostname===host||u.hostname.endsWith('.'+host))}catch{return false}}
 $('go').addEventListener('click',async()=>{
