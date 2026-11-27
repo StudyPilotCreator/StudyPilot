@@ -9,7 +9,7 @@
 - The PWA shell is cached for basic offline opening, but processing requires the local server.
 
 ## Important limitations
-- This version does **not** extract/download arbitrary YouTube or Twitch videos from a URL. A URL alone doesn't provide legal or technical access to source video bytes; use your own video file or a source you have rights/permission to edit.
+- Link processing is experimental: the Mac uses yt-dlp to retrieve supported public video links. This is not guaranteed for every YouTube/Twitch URL, protected content, live streams, age/region restrictions, or platform changes. Use only content you have permission to process and comply with platform rules.
 - Mac is the full local processing mode.
 - iPhone standalone AI processing is **not yet implemented**. Mobile can choose a file and submit it to the Mac server over local Wi-Fi; when away from the Mac it is currently just a lightweight UI/file selection, not clip generation.
 - Highlight ranking is heuristic (transcript words, speech density, punctuation); it is not a guaranteed viral predictor.
