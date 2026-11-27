@@ -28,6 +28,14 @@ def auth(token: Optional[str]):
     if not token or not secrets.compare_digest(token, TOKEN):
         raise HTTPException(401, "Token fehlt oder ist falsch. Token im Terminal ablesen.")
 
+@app.get("/")
+def home():
+    return FileResponse(Path(__file__).parent/"mobile.html", media_type="text/html")
+
+@app.get("/mobile")
+def mobile_page():
+    return FileResponse(Path(__file__).parent/"mobile.html", media_type="text/html")
+
 @app.get("/api/health")
 def health(): return {"ok": True, "service": "ClipPilot Local", "version": "0.1"}
 
