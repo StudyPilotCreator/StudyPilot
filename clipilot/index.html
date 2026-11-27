@@ -60,6 +60,7 @@ function setStatus(message,error=false){$("status").textContent=message;$("statu
 function getToken(){return $("token").value.trim()||localStorage.getItem(TOKEN_KEY)||""}
 $("token").value=localStorage.getItem(TOKEN_KEY)||"";
 if(!$("token").value)$("setup").open=true;
+if(location.hostname.endsWith("github.io")){$("save").disabled=true;$("go").disabled=true;setStatus("Diese GitHub-Seite ist nur die Oberfläche. Öffne http://127.0.0.1:8765 auf deinem Mac, während ClipPilot läuft.",true);}
 async function testAndSaveToken(){
  const token=getToken();if(!token){$("setup").open=true;setStatus("Bitte zuerst das Token aus dem ClipPilot-Terminal eintragen.",true);return false}
  try{
