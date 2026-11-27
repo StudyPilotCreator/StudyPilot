@@ -48,31 +48,78 @@ def srt_time(seconds: float) -> str:
     return f"{h:02}:{m:02}:{s:02},{ms:03}"
 
 def score_window(segments, start, end):
-    text = " ".join(x["text"] for x in segments if x["start"] < end and x["end"] > start).lower()
-    count = sum(1 for x in segments if x["start"] < end and x["end"] > start)
-    excitement = sum(text.count(w) for w in ["wow","wtf","oh my","nein","no way","krass","unglaublich","warte","bro","holy","actually","finally","suddenly","but","why","what","geil","verdammt","!","?"])
-    density = min(20, count * 0.7)
-    return density + excitement * 2.0 + min(len(text)/90, 8)
+    """Rank a window for short-form potential using transcript signals (heuristic)."""
+    selected = [x for x in segments if x["start"] < end and x["end"] > start]
+    if not selected:
+        return -100.0
+
+    text = " ".join(x["text"] for x in selected).lower()
+    words = re.findall(r"\\b[\\w']+\\b", text)
+    word_count = len(words)
+    speech_seconds = sum(max(0.0, min(end, x["end"]) - max(start, x["start"])) for x in selected)
+    speech_ratio = min(1.0, speech_seconds / max(1.0, end - start))
+
+    # Stronger semantic-style cues than simply counting generic words like "but".
+    cues = {
+        "reaction": ["wow", "wtf", "oh my god", "no way", "holy", "what?!", "unglaublich", "krass", "geisteskrank", "niemals", "ernsthaft"],
+        "emotion": ["ich liebe", "ich hasse", "verdammt", "geil", "schlimm", "unfassbar", "crazy", "wild", "crazy", "brutal", "absurd"],
+        "turning": ["aber dann", "plötzlich", "auf einmal", "doch dann", "am ende", "actually", "finally", "suddenly", "in the end", "turns out"],
+        "reveal": ["das problem", "der grund", "die lösung", "geheimnis", "revealed", "here's why", "deshalb", "darum", "because"],
+    }
+    cue_score = 0.0
+    for category, phrases in cues.items():
+        matches = sum(text.count(phrase) for phrase in phrases)
+        weight = {"reaction": 3.2, "emotion": 2.2, "turning": 2.5, "reveal": 2.0}[category]
+        cue_score += min(4, matches) * weight
+
+    punctuation = sum(x["text"].count("!") + 0.6 * x["text"].count("?") for x in selected)
+    sentence_starts = sum(1 for x in selected if x["text"].strip())
+    # Reward a healthy amount of clear speech, not a window with only one isolated word.
+    density = min(12.0, word_count / max(1.0, (end - start)) * 20.0)
+    coverage = speech_ratio * 10.0
+    length_quality = min(8.0, word_count / 7.0)
+    punctuation_score = min(5.0, punctuation * 0.7)
+    fragmentation_penalty = max(0, sentence_starts - word_count / 8.0) * 0.25
+    sparse_penalty = 6.0 if word_count < 8 else (2.5 if word_count < 18 else 0.0)
+    # Mild diversity reward: avoid selecting the same repeated phrase as the sole signal.
+    diversity = min(4.0, len(set(words)) / max(1, word_count) * 12.0)
+    return density + coverage + length_quality + cue_score + punctuation_score + diversity - fragmentation_penalty - sparse_penalty
+
 
 def choose_windows(segments, duration, count, total):
-    if not segments: return []
-    maxstart=max(0,total-duration)
-    step=max(8,duration//3)
-    candidates=[]
-    start=0
-    while start<=maxstart:
-        candidates.append((score_window(segments,start,start+duration),start))
-        start+=step
-    if not candidates: candidates=[(score_window(segments,0,duration),0)]
-    candidates.sort(reverse=True)
-    picked=[]
-    for score,start in candidates:
-        if all(start+duration <= p or start >= p+duration for p in picked):
+    if not segments:
+        return []
+    duration = max(15, min(90, int(duration)))
+    count = max(1, min(10, int(count)))
+    maxstart = max(0, total - duration)
+
+    # Evaluate candidates aligned to spoken segment boundaries as well as a regular
+    # grid, so clips are less likely to begin mid-sentence.
+    step = max(5, min(12, duration // 5))
+    starts = {0.0, float(maxstart)}
+    cursor = 0.0
+    while cursor <= maxstart:
+        starts.add(round(cursor, 2))
+        cursor += step
+    for seg in segments:
+        for offset in (0.0, -3.0, -7.0, -12.0):
+            s = max(0.0, min(maxstart, float(seg["start"]) + offset))
+            starts.add(round(s, 2))
+
+    candidates = [(score_window(segments, s, s + duration), s) for s in starts]
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    picked = []
+    min_gap = max(0, duration * 0.35)
+    for score, start in candidates:
+        if score <= -50:
+            continue
+        if all(start + duration <= p - min_gap or start >= p + duration + min_gap for p in picked):
             picked.append(start)
-            if len(picked)>=count: break
-    if not picked:
-        picked=[0]
-    return [(s,min(total,s+duration)) for s in sorted(picked)]
+            if len(picked) >= count:
+                break
+    if not picked and candidates:
+        picked = [candidates[0][1]]
+    return [(s, min(total, s + duration)) for s in sorted(picked)]
 
 def write_srt(segments, start, end, path):
     lines=[]; idx=1
