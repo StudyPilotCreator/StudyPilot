@@ -1,9 +1,73 @@
-<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0b0d10"><title>ClipPilot Mobile · Link Clips</title><style>
-:root{color-scheme:dark;--bg:#0b0d10;--panel:#15191f;--line:#303640;--lime:#a5f36c;--muted:#a0a6af}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#f4f5f7;font:16px system-ui,-apple-system,sans-serif}.wrap{max-width:650px;margin:auto;padding:20px 15px 60px}.brand{font-weight:850;font-size:22px}.brand span{color:var(--lime)}.tag{color:var(--lime);font-size:12px;border:1px solid #3e5633;padding:6px 10px;border-radius:99px;display:inline-block;margin-top:15px}.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:17px;margin-top:18px}h1{font-size:29px;line-height:1.1;margin:20px 0 8px}p{color:var(--muted);line-height:1.5;font-size:14px}.label{font-size:14px;font-weight:700;margin:14px 0 8px}.input,select{width:100%;padding:13px;background:#0c0e12;color:#fff;border:1px solid #343a43;border-radius:12px;font:inherit}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.btn{width:100%;background:var(--lime);color:#13200e;border:0;border-radius:12px;padding:14px;font-weight:800;font-size:16px;margin-top:12px}.btn:disabled{opacity:.5}.status{white-space:pre-wrap;background:#101318;border:1px solid #414851;padding:12px;border-radius:12px;margin-top:12px;font-size:13px}.result{border:1px solid #3a414b;border-radius:12px;padding:12px;margin-top:12px}.result a{color:var(--lime)}.back{color:var(--lime);text-decoration:none}.muted{color:var(--muted);font-size:12px}.warning{color:#f6ca7a}
-</style></head><body><main class="wrap"><a class="back" href="./">← ClipPilot</a><div class="brand" style="margin-top:12px">Clip<span>Pilot</span></div><div class="tag">IPHONE · LINK-TO-CLIPS</div><h1>Link rein.<br>Clips raus.</h1><p>Füge einen öffentlichen Video-Link ein. Dein Mac verarbeitet das Video lokal und schickt fertige Clips zurück an dein iPhone. Der Mac muss laufen und beide Geräte im selben WLAN sein.</p>
-<div class="card"><div class="label">1 · Video-Link</div><input class="input" id="url" placeholder="YouTube- oder Twitch-Link" autocomplete="url"><div class="label">2 · Mac-Adresse im WLAN (z. B. http://192.168.1.23:8765)</div><input class="input" id="server" placeholder="http://Mac-IP:8765"><div class="label">Zugriffstoken (vom Mac-Terminal)</div><input class="input" id="token" placeholder="Token einfügen"><div class="row"><div><div class="label">Clip-Anzahl</div><select id="count"><option>1</option><option selected>3</option><option>5</option></select></div><div><div class="label">Länge</div><select id="duration"><option value="30">30 Sekunden</option><option value="45" selected>45 Sekunden</option><option value="60">60 Sekunden</option></select></div></div><button id="go" class="btn">Clips erstellen</button><div id="status" class="status">Warte auf Link und Mac-Verbindung.</div><div id="results"></div></div>
-<div class="card"><b>Wichtig für iPhone:</b><p>Safari auf dem iPhone ist nicht in der Lage, YouTube/Twitch-Links zuverlässig selbst auszulesen und zu verarbeiten. Deshalb nutzt diese Beta den lokalen Mac als Rechenstation. Es werden keine Videos zu ClipPilot-Cloudservern hochgeladen. Nutze nur Videos, die du bearbeiten darfst. Manche Links sind geschützt, privat, live oder von der Quelle nicht abrufbar.</p></div></main>
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#090c10"><title>ClipPilot Mobile</title>
+<style>
+:root{color-scheme:dark;--bg:#090c10;--panel:#141920;--panel2:#0e1319;--line:#29323d;--lime:#a8f46c;--text:#f4f7f8;--muted:#9ba6b2;--danger:#ff8c8c}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(850px 420px at 85% -15%,#203523 0%,transparent 55%),var(--bg);color:var(--text);font:16px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{width:min(100%,620px);margin:auto;padding:calc(16px + env(safe-area-inset-top)) 16px calc(34px + env(safe-area-inset-bottom))}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:23px;letter-spacing:-.7px}.logo{width:35px;height:35px;display:grid;place-items:center;border-radius:11px;background:var(--lime);color:#15200f;font-size:18px}.brand span{color:var(--lime)}
+.pill{display:inline-flex;align-items:center;border:1px solid #42533a;background:#111a12;color:var(--lime);font-size:11px;font-weight:750;letter-spacing:1px;padding:7px 10px;border-radius:99px;margin-top:18px}
+h1{font-size:clamp(34px,10vw,46px);line-height:1.04;letter-spacing:-1.6px;margin:17px 0 10px}h1 em{font-style:normal;color:var(--lime)}.intro{color:var(--muted);font-size:14px;line-height:1.55;margin:0 0 23px}
+.card{background:linear-gradient(180deg,#161c23,#11161c);border:1px solid var(--line);border-radius:20px;padding:17px;margin:14px 0}
+.label{font-size:13px;font-weight:750;margin:0 0 9px}.input,select{width:100%;border:1px solid #303a45;background:#0a0e13;color:#fff;border-radius:12px;padding:14px;font:inherit;min-height:48px;outline:none}.input:focus,select:focus{border-color:var(--lime);box-shadow:0 0 0 2px #a8f46c22}.helper{font-size:12px;color:var(--muted);line-height:1.45;margin:8px 0 0}.section{margin-top:18px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.btn{width:100%;border:0;border-radius:13px;background:var(--lime);color:#13200d;font-weight:850;font-size:16px;padding:15px 14px;min-height:52px;margin-top:16px}.btn:disabled{opacity:.55}.status{border:1px solid #37424d;background:#0c1116;border-radius:12px;padding:12px;font-size:13px;line-height:1.5;white-space:pre-wrap;margin-top:12px;color:#dce4e8}.status.error{border-color:#643b3b;color:#ffc1c1}.result{border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:10px;background:#0e1319}.result a{color:var(--lime);font-weight:700;text-decoration:none}.result small{display:block;color:var(--muted);margin:7px 0}.steps{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:12px;margin:0 0 12px}.stepdot{width:23px;height:23px;border:1px solid #48525d;border-radius:50%;display:grid;place-items:center;color:var(--text);font-weight:700}.warning{font-size:12px;color:#e5c27b;line-height:1.5}.footer{text-align:center;color:#717c87;font-size:11px;line-height:1.5;margin:20px 0}
+</style></head>
+<body><main>
+<header class="brand"><div class="logo">✦</div>Clip<span>Pilot</span></header>
+<div class="pill">MOBILE CLIP STUDIO · BETA</div>
+<h1>Aus langen Videos<br><em>starke Clips.</em></h1>
+<p class="intro">ClipPilot sucht interessante Momente, schneidet vertikale Shorts und erstellt automatisch Untertitel. Du musst nur den Link einfügen.</p>
+<div class="card">
+<div class="steps"><span class="stepdot">1</span><b>Video-Link</b></div>
+<label class="label" for="url">YouTube- oder Twitch-Link</label>
+<input id="url" class="input" type="url" placeholder="Link hier einfügen" autocomplete="url" autocapitalize="off">
+<p class="helper">Bitte nur Videos verwenden, die du selbst erstellt hast oder bearbeiten darfst. Private, Live- oder geschützte Links funktionieren möglicherweise nicht.</p>
+<div class="section"><div class="steps"><span class="stepdot">2</span><b>Clip-Einstellungen</b></div>
+<div class="grid">
+<div><label class="label" for="count">Wie viele Clips?</label><select id="count"><option value="1">1 Highlight</option><option value="3" selected>3 Highlights</option><option value="5">5 Highlights</option></select></div>
+<div><label class="label" for="duration">Clip-Länge</label><select id="duration"><option value="30">30 Sekunden</option><option value="45" selected>45 Sekunden</option><option value="60">60 Sekunden</option></select></div>
+</div>
+<div class="section"><div class="steps"><span class="stepdot">3</span><b>Verarbeitung verbinden</b></div>
+<label class="label" for="server">ClipPilot-Server-Adresse</label><input id="server" class="input" placeholder="http://Mac-IP:8765" inputmode="url" autocomplete="url">
+<div class="section"><label class="label" for="token">Verbindungstoken</label><input id="token" class="input" type="password" placeholder="Token aus ClipPilot-Terminal"></div>
+<p class="helper">Die mobile Website ist bereit. Für die Verarbeitung muss der ClipPilot-Rechner online sein und erreichbar bleiben. Die Zugangsdaten werden nur in dieser Browser-Sitzung verwendet.</p>
+<button id="go" class="btn">✦ Highlights erstellen</button>
+<div id="status" class="status">Bereit. Link und Server-Verbindung eintragen.</div>
+<div id="results"></div>
+</div>
+</div>
+<div class="card"><b>Was ClipPilot versucht, zu erkennen</b><p class="helper">Spannende Aussagen, Fragen und Antworten, Reaktionen, Ausrufe, inhaltliche Wendepunkte sowie Abschnitte mit dichter Sprache. Die Auswahl ist eine automatische Bewertung und kann nicht jeden viralen Moment erkennen.</p></div>
+<p class="footer">ClipPilot Mobile Beta · 9:16 Hochformat · automatische Untertitel<br>Kein Video-Upload auf einen fremden Clip-Dienst durch diese Website.</p>
+</main>
 <script>
-const $=id=>document.getElementById(id);function status(t){$('status').textContent=t}
-$('go').onclick=async()=>{const url=$('url').value.trim(),base=$('server').value.trim().replace(/\/$/,''),token=$('token').value.trim();if(!/^https?:\/\//i.test(url)){status('Bitte einen gültigen Video-Link einfügen.');return}if(!base||!token){status('Bitte Mac-Adresse und Token eingeben.');return}const btn=$('go');btn.disabled=true;$('results').innerHTML='';status('Verbinde mit dem Mac…');try{const form=new FormData();form.append('url',url);form.append('count',$('count').value);form.append('duration',$('duration').value);form.append('model','tiny');const res=await fetch(base+'/api/process-link',{method:'POST',headers:{'X-ClipPilot-Token':token},body:form});let data;try{data=await res.json()}catch{throw new Error('Antwort vom Mac nicht lesbar. Prüfe die Adresse.')}if(!res.ok)throw new Error(data.detail||('Serverfehler '+res.status));status('Link verarbeitet. '+data.clips.length+' Clip(s) erstellt.');data.clips.forEach((c,i)=>{const dl=base+'/api/download/'+encodeURIComponent(c.file).replace(/%2F/g,'/');const el=document.createElement('div');el.className='result';el.innerHTML='<b>Highlight '+(i+1)+' · '+c.duration+' Sekunden</b><p><a href="'+dl+'" target="_blank" rel="noopener">Clip öffnen / speichern</a></p>'; $('results').appendChild(el)})}catch(e){status('Verarbeitung fehlgeschlagen: '+e.message+'\nHinweis: iPhone und Mac müssen im selben WLAN sein; öffne die mobile Seite über die Mac-Adresse, nicht die GitHub-Pages-URL, wenn Safari den lokalen Zugriff blockiert.')}finally{btn.disabled=false}};
+const $=id=>document.getElementById(id);
+function setStatus(msg,err=false){$('status').textContent=msg;$('status').classList.toggle('error',err)}
+function validVideoLink(value){try{const u=new URL(value);return ['youtube.com','www.youtube.com','youtu.be','m.youtube.com','twitch.tv','www.twitch.tv','clips.twitch.tv'].some(host=>u.hostname===host||u.hostname.endsWith('.'+host))}catch{return false}}
+$('go').addEventListener('click',async()=>{
+ const url=$('url').value.trim(),base=$('server').value.trim().replace(/\/$/,''),token=$('token').value.trim(),btn=$('go');
+ if(!validVideoLink(url)){setStatus('Bitte einen gültigen YouTube- oder Twitch-Link einfügen.',true);return}
+ if(!base||!token){setStatus('Bitte Server-Adresse und Token eintragen. Ohne aktiven ClipPilot-Server können keine Clips erzeugt werden.',true);return}
+ if(!/^https?:\/\//i.test(base)){setStatus('Server-Adresse muss mit http:// oder https:// beginnen.',true);return}
+ btn.disabled=true;$('results').innerHTML='';setStatus('1/3 · Verbindung zum ClipPilot-Server wird geprüft…');
+ try{
+  const health=await fetch(base+'/api/health',{signal:AbortSignal.timeout(12000)});
+  if(!health.ok)throw new Error('ClipPilot-Server ist nicht erreichbar ('+health.status+').');
+  setStatus('2/3 · Video wird abgerufen und analysiert. Bei längeren Videos kann das einige Minuten dauern. Bitte diese Seite geöffnet lassen.');
+  const fd=new FormData();fd.append('url',url);fd.append('count',$('count').value);fd.append('duration',$('duration').value);fd.append('model','base');
+  const r=await fetch(base+'/api/process-link',{method:'POST',headers:{'X-ClipPilot-Token':token},body:fd});
+  let data;try{data=await r.json()}catch{throw new Error('Serverantwort konnte nicht gelesen werden.')}
+  if(!r.ok)throw new Error(data.detail||'Verarbeitung fehlgeschlagen (HTTP '+r.status+')');
+  const clips=data.clips||[];if(!clips.length)throw new Error('Es wurden keine Clip-Ergebnisse zurückgegeben.');
+  clips.forEach((c,i)=>{
+    const card=document.createElement('div');card.className='result';
+    const title=document.createElement('b');title.textContent=(c.name||'Highlight '+(i+1))+' · '+c.duration+' s';
+    const note=document.createElement('small');note.textContent='Vertikaler Clip mit Untertiteln';
+    const link=document.createElement('a');link.textContent='Clip ansehen / speichern ↗';link.href=base+'/api/download/'+String(c.file).split('/').map(encodeURIComponent).join('/');link.target='_blank';link.rel='noopener';
+    card.append(title,note,link);$('results').appendChild(card)
+  });
+  setStatus('3/3 · Fertig! '+clips.length+' Clip(s) wurden erstellt. Tippe auf einen Clip, um ihn anzusehen oder zu speichern.');
+ }catch(e){setStatus('Fehler: '+e.message+'\n\nFalls du gerade ohne Mac bist: Diese mobile Oberfläche läuft, aber die eigentliche Video-KI braucht aktuell noch einen Online-Verarbeitungsserver. Der lokale Mac-Server ist nicht automatisch in der Website enthalten.',true)}
+ finally{btn.disabled=false}
+});
 </script></body></html>
