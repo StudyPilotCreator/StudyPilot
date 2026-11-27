@@ -1,26 +1,38 @@
-# ClipPilot Local (Mac)
+# ClipPilot Local (Mac + Browser + iPhone)
 
-## Status / Grenzen
-- Die Browser-Oberfläche wird über GitHub Pages geladen.
-- Mac-Backend verarbeitet **lokal ausgewählte Videodateien**: Whisper-Transkript, grobe Highlight-Scoring, FFmpeg 9:16 MP4 mit Untertiteln.
-- Es gibt **keinen automatischen Download/Extraktor für beliebige YouTube-/Twitch-URLs**. Plattformzugriff und Rechte sind nicht garantiert; verwende eigene Dateien oder Quellen, für die du Bearbeitungsrechte hast.
-- iPhone-Sparmodus in der Browser-Oberfläche ist derzeit ein einfacher UI/Datei-Auswahl-Modus. Für Verarbeitung kann das iPhone im selben WLAN den Mac-Server mit Token nutzen. Unabhängige KI-Verarbeitung auf dem iPhone ist noch nicht implementiert.
+## What is working in this version
+- GitHub Pages browser UI with Mac Pro and iPhone Spar modes.
+- Mac local API: processes **video files selected by the user**, locally.
+- Whisper (faster-whisper) transcription, basic transcript-based highlight scoring, FFmpeg vertical MP4 export with SRT captions.
+- Token-protected API. The server prints a token on startup.
+- iPhone PWA shell can be added to the Home Screen; it can connect to the Mac server while both devices are on the same Wi-Fi.
+- The PWA shell is cached for basic offline opening, but processing requires the local server.
 
-## Mac-Installation
-1. Repository auf dem Mac klonen oder den Ordner `clipilot` als Dateien lokal verfügbar machen.
-2. Terminal im Ordner `clipilot` öffnen.
-3. `bash Install_ClipPilot.command` ausführen (Homebrew/FFmpeg und Python-Pakete).
-4. `bash Start_ClipPilot.command` ausführen und Terminal geöffnet lassen.
-5. Browser öffnen: https://studypilotcreator.github.io/StudyPilot/clipilot/
-6. Token, das im Terminal angezeigt wird, in das Token-Feld der Website eintragen.
-7. Videodatei auswählen, Clipanzahl/Länge einstellen, Clips erstellen.
+## Important limitations
+- This version does **not** extract/download arbitrary YouTube or Twitch videos from a URL. A URL alone doesn't provide legal or technical access to source video bytes; use your own video file or a source you have rights/permission to edit.
+- Mac is the full local processing mode.
+- iPhone standalone AI processing is **not yet implemented**. Mobile can choose a file and submit it to the Mac server over local Wi-Fi; when away from the Mac it is currently just a lightweight UI/file selection, not clip generation.
+- Highlight ranking is heuristic (transcript words, speech density, punctuation); it is not a guaranteed viral predictor.
+- First run downloads Whisper model weights. There are no paid API calls.
 
-## iPhone im gleichen WLAN
-1. Mac-Server starten.
-2. Mac-IP im WLAN herausfinden (Systemeinstellungen > WLAN > Details > TCP/IP).
-3. In ClipPilot iPhone-Modus IP und Port eintragen, z.B. `http://192.168.1.20:8765`, plus Token.
-4. Datei auf dem iPhone auswählen. iPhone und Mac müssen im selben WLAN sein.
-5. Achtung: iPhone-Safari kann bei großen Uploads/Verbindungen Limits haben.
+## Mac setup (one time)
+1. Open Terminal.
+2. Clone the repo: `git clone https://github.com/StudyPilotCreator/StudyPilot.git`
+3. Enter project: `cd StudyPilot/clipilot`
+4. Install: `bash Install_ClipPilot.command` (Homebrew + FFmpeg + Python dependencies; install can take a while).
+5. Start local backend: `bash Start_ClipPilot.command` and keep Terminal running.
+6. Open the web UI: https://studypilotcreator.github.io/StudyPilot/clipilot/
+7. Copy the token printed in Terminal into the **Lokaler Server-Token** field.
+8. Select a video file and choose number/duration. Click **Lokale Clips erstellen**.
+9. The output MP4s are stored under `~/.clippilot/clips/` and linked in the page.
 
-## Sicherheit
-Der Server bindet an alle lokalen Netzwerkinterfaces, um die Verbindung vom iPhone zu erlauben. Er ist mit Token geschützt. Teile den Token nicht; stoppe den Server, wenn du ihn nicht brauchst.
+## iPhone setup
+1. Open the web UI in Safari: https://studypilotcreator.github.io/StudyPilot/clipilot/
+2. Safari Share button > **Add to Home Screen**.
+3. To process on Mac over Wi-Fi, start the Mac backend and use the iPhone mode.
+4. Find the Mac's private Wi-Fi IP (Mac System Settings > Wi-Fi > Details > TCP/IP), then enter e.g. `http://192.168.1.20:8765` plus the token.
+5. Choose the video in iPhone Files/Photos picker and submit. Both devices must be on same Wi-Fi; keep Mac awake.
+6. If away from Mac, mobile processing is not currently available; this is planned as a separate on-device light engine.
+
+## Safety
+Local server binds to LAN for optional iPhone connection and uses a token. Don't share the token. Stop the server when not needed.
