@@ -7,6 +7,6 @@ if [ ! -x .venv/bin/python ]; then
   exit 1
 fi
 echo "ClipPilot Local startet. Dieses Terminal offen lassen."
-echo "Die Website: https://studypilotcreator.github.io/StudyPilot/clipilot/"
+echo "Mobile Link-Seite lokal: http://<MAC-IP>:8765/mobile (Mac-IP in WLAN-Einstellungen finden)"\necho "Mac UI: https://studypilotcreator.github.io/StudyPilot/clipilot/"
 echo "Token steht gleich hier im Terminal. In die Website eintragen."
 ./.venv/bin/uvicorn server:app --host 0.0.0.0 --port 8765
