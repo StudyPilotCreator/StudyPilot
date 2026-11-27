@@ -54,7 +54,7 @@ def score_window(segments, start, end):
         return -100.0
 
     text = " ".join(x["text"] for x in selected).lower()
-    words = re.findall(r"\\b[\\w']+\\b", text)
+    words = re.findall(r"\b[\w']+\b", text)
     word_count = len(words)
     speech_seconds = sum(max(0.0, min(end, x["end"]) - max(start, x["start"])) for x in selected)
     speech_ratio = min(1.0, speech_seconds / max(1.0, end - start))
@@ -154,7 +154,7 @@ def process_source(src: Path, original_name: str, count: int, duration: int, mod
             write_srt(segments,start,end,srt)
             vf="crop='min(iw,ih*9/16)':ih,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920"
             if srt.stat().st_size:
-                vf+=f",subtitles='{ffmpeg_sub_path(srt)}':force_style='FontSize=18,Outline=2,Shadow=1,Alignment=2,MarginV=140'"
+                vf+=f",subtitles='{ffmpeg_sub_path(srt)}':force_style='FontSize=42,Outline=3,Shadow=1,Alignment=2,MarginV=180'"
             command=["ffmpeg","-y","-ss",str(start),"-i",str(src),"-t",str(end-start),"-vf",vf,"-c:v","libx264","-preset","veryfast","-crf","24","-c:a","aac","-b:a","128k","-movflags","+faststart",str(clip)]
             subprocess.run(command,check=True,capture_output=True)
             results.append({"name":f"Highlight {i}","duration":round(end-start,1),"file":job+"/"+clipname})
