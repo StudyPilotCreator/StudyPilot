@@ -27,6 +27,11 @@
 9. The output MP4s are stored under `~/.clippilot/clips/` and linked in the page.
 
 ## iPhone setup
+1. Open the dedicated mobile page in Safari: https://studypilotcreator.github.io/StudyPilot/clipilot/mobile.html
+2. For the Mac-powered processing flow, open the same page while the Mac server is running, then enter the Mac's LAN URL and token.
+3. If the GitHub Pages URL is not published/accessible, open the page from the repository after Pages deployment is enabled.
+
+## iPhone + Mac link-processing steps
 1. Open the web UI in Safari: https://studypilotcreator.github.io/StudyPilot/clipilot/
 2. Safari Share button > **Add to Home Screen**.
 3. To process on Mac over Wi-Fi, start the Mac backend and use the iPhone mode.
