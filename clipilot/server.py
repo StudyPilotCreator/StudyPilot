@@ -80,17 +80,11 @@ def write_srt(segments, start, end, path):
 def ffmpeg_sub_path(path):
     return str(path).replace("\\","\\\\").replace(":","\\:").replace("'","\\'")
 
-@app.post("/api/process")
-async def process_video(video: UploadFile=File(...), count: int=Form(3), duration: int=Form(45), model: str=Form("base"), x_clippilot_token: Optional[str]=Header(None)):
-    auth(x_clippilot_token)
-    if not video.filename: raise HTTPException(400,"Videodatei fehlt.")
+def process_source(src: Path, original_name: str, count: int, duration: int, model: str):
     count=max(1,min(10,count)); duration=max(15,min(90,duration))
     model = model if model in ("tiny","base","small") else "base"
     job=secrets.token_hex(5); jobdir=OUT/job; jobdir.mkdir(parents=True,exist_ok=True)
-    src=INBOX/(job+"_"+safe_filename(video.filename))
     try:
-        with src.open("wb") as f:
-            while chunk:=await video.read(1024*1024): f.write(chunk)
         probe=subprocess.run(["ffprobe","-v","error","-show_entries","format=duration","-of","json",str(src)],capture_output=True,text=True,check=True)
         total=float(json.loads(probe.stdout)["format"]["duration"])
         if total<5: raise HTTPException(400,"Video ist zu kurz.")
@@ -98,7 +92,7 @@ async def process_video(video: UploadFile=File(...), count: int=Form(3), duratio
         transcribed,_=wm.transcribe(str(src),vad_filter=True)
         segments=[{"start":float(s.start),"end":float(s.end),"text":s.text.strip()} for s in transcribed]
         windows=choose_windows(segments,duration,count,total)
-        if not windows: raise HTTPException(422,"Keine Sprache erkannt. Bitte ein Video mit klarer Sprache testen.")
+        if not windows: raise HTTPException(422,"Keine Sprache erkannt. Video mit klarer Sprache testen.")
         results=[]
         for i,(start,end) in enumerate(windows,1):
             clipname=f"clip_{i:02d}.mp4"; clip=jobdir/clipname; srt=jobdir/f"clip_{i:02d}.srt"
@@ -109,13 +103,46 @@ async def process_video(video: UploadFile=File(...), count: int=Form(3), duratio
             command=["ffmpeg","-y","-ss",str(start),"-i",str(src),"-t",str(end-start),"-vf",vf,"-c:v","libx264","-preset","veryfast","-crf","24","-c:a","aac","-b:a","128k","-movflags","+faststart",str(clip)]
             subprocess.run(command,check=True,capture_output=True)
             results.append({"name":f"Highlight {i}","duration":round(end-start,1),"file":job+"/"+clipname})
-        src.unlink(missing_ok=True)
         return {"job":job,"clips":results,"transcript_segments":len(segments),"processing":"local"}
     except HTTPException:
-        src.unlink(missing_ok=True); raise
+        raise
     except Exception as exc:
-        src.unlink(missing_ok=True)
         raise HTTPException(500,f"Lokale Verarbeitung fehlgeschlagen: {exc}")
+
+@app.post("/api/process")
+async def process_video(video: UploadFile=File(...), count: int=Form(3), duration: int=Form(45), model: str=Form("base"), x_clippilot_token: Optional[str]=Header(None)):
+    auth(x_clippilot_token)
+    if not video.filename: raise HTTPException(400,"Videodatei fehlt.")
+    src=INBOX/(secrets.token_hex(5)+"_"+safe_filename(video.filename))
+    try:
+        with src.open("wb") as f:
+            while chunk:=await video.read(1024*1024): f.write(chunk)
+        result=process_source(src,video.filename,count,duration,model)
+        return result
+    finally:
+        src.unlink(missing_ok=True)
+
+@app.post("/api/process-link")
+async def process_link(url: str=Form(...), count: int=Form(3), duration: int=Form(45), model: str=Form("tiny"), x_clippilot_token: Optional[str]=Header(None)):
+    auth(x_clippilot_token)
+    # Only public videos/streams accessible to the downloader; users must have rights or permission.
+    if not re.match(r"^https?://",url.strip(),re.I):
+        raise HTTPException(400,"Bitte einen gültigen http(s)-Link einfügen.")
+    src=INBOX/(secrets.token_hex(5)+".source")
+    try:
+        import yt_dlp
+        opts={"format":"best[height<=720]/best","outtmpl":str(src),"quiet":True,"no_warnings":True,"noplaylist":True,"max_filesize":500*1024*1024}
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            ydl.download([url.strip()])
+        candidates=list(INBOX.glob(src.name+"*"))
+        if not candidates: raise HTTPException(422,"Video konnte über diesen Link nicht abgerufen werden. Link kann geschützt oder nicht unterstützt sein.")
+        downloaded=candidates[0]
+        return process_source(downloaded, downloaded.name,count,duration,model)
+    except HTTPException: raise
+    except Exception as exc:
+        raise HTTPException(422,f"Link-Verarbeitung fehlgeschlagen: {exc}")
+    finally:
+        for item in INBOX.glob(src.name+"*"): item.unlink(missing_ok=True)
 
 @app.get("/api/download/{file_path:path}")
 def download(file_path: str):
