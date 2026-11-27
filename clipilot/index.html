@@ -1,30 +1,101 @@
 <!doctype html>
-<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b0d10"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="ClipPilot"><link rel="manifest" href="./manifest.webmanifest"><link rel="apple-touch-icon" href="./icon.svg"><title>ClipPilot — Local Shorts Studio</title>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b0d10">
+<title>ClipPilot — YouTube zu Shorts</title>
 <style>
-:root{color-scheme:dark;--bg:#0b0d10;--panel:#14171c;--panel2:#1b1f25;--line:#292e36;--lime:#a5f36c;--text:#f5f7f8;--muted:#9299a4}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(900px 500px at 75% -20%,#253327 0%,transparent 60%),var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-system,sans-serif;color:var(--text)}.wrap{max-width:1000px;margin:auto;padding:24px 18px 70px}.nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:44px;gap:12px}.logo{font-weight:850;font-size:23px;letter-spacing:-.8px}.logo span{color:var(--lime)}.pill{font-size:12px;color:var(--lime);border:1px solid #42553c;border-radius:99px;padding:7px 12px}.hero{text-align:center;margin-bottom:30px}.eyebrow{font-size:12px;letter-spacing:2px;color:var(--lime);font-weight:700}.hero h1{font-size:clamp(34px,6vw,60px);line-height:1.03;letter-spacing:-2px;margin:14px 0}.hero p{color:var(--muted);font-size:16px;max-width:620px;margin:auto;line-height:1.6}.card{max-width:760px;margin:auto;background:linear-gradient(180deg,#171a20,#121519);border:1px solid var(--line);border-radius:22px;padding:22px;box-shadow:0 30px 90px #0005}.label{font-size:14px;font-weight:650;margin:0 0 10px}.input{width:100%;background:#0b0d10;border:1px solid #343a43;border-radius:12px;color:white;font-size:16px;padding:14px;outline:none}.input:focus{border-color:var(--lime);box-shadow:0 0 0 3px #a5f36c1c}.help{font-size:13px;color:var(--muted);margin:9px 0 18px}.modes{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}.mode{border:1px solid var(--line);background:#101318;border-radius:14px;padding:14px;text-align:left;cursor:pointer;color:white}.mode.active{border-color:var(--lime);background:#1b2518}.mode strong{display:block;margin:5px 0}.mode small{color:var(--muted);line-height:1.45}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.field label{display:block;font-size:13px;color:var(--muted);margin-bottom:8px}.field select{width:100%;padding:12px;background:#0b0d10;border:1px solid #343a43;color:white;border-radius:10px}.file{display:block;border:1px dashed #4a525c;background:#101318;padding:16px;border-radius:12px;margin:12px 0;color:#cbd2da}.btn{width:100%;border:0;background:var(--lime);color:#15200f;font-weight:800;font-size:16px;padding:15px;border-radius:12px;margin-top:18px;cursor:pointer}.btn:disabled{opacity:.55;cursor:wait}.status{display:none;margin-top:18px;border:1px solid #4b593e;background:#1b2419;border-radius:12px;padding:15px;color:#d9f6ca;line-height:1.5;white-space:pre-wrap}.status.show{display:block}.features{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:760px;margin:22px auto}.feature{background:#111419;border:1px solid var(--line);border-radius:14px;padding:16px}.feature b{display:block;margin:9px 0 6px}.feature p{font-size:13px;line-height:1.5;color:var(--muted);margin:0}.result{margin-top:12px;border:1px solid var(--line);border-radius:12px;padding:12px}.result a{color:var(--lime)}.foot{text-align:center;color:#707782;font-size:12px;margin-top:35px}.hidden{display:none!important}@media(max-width:620px){.wrap{padding:18px 14px 50px}.nav{margin-bottom:30px}.card{padding:16px}.grid,.features{grid-template-columns:1fr}.modes{grid-template-columns:1fr}.hero p{font-size:14px}}
-</style></head><body><main class="wrap"><header class="nav"><div class="logo">Clip<span>Pilot</span></div><a class="pill" href="./mobile.html" style="text-decoration:none">📱 iPhone-Version</a><div class="pill" id="connection">LOCAL · CHECK</div></header>
-<section class="hero"><div class="eyebrow">LOCAL SHORTS STUDIO</div><h1>Long videos.<br><span style="color:var(--lime)">Short moments.</span></h1><p>Highlight-Clips mit Untertiteln erstellen – auf deinem Gerät, ohne Cloud-KI oder API-Gebühren.</p></section>
+:root{color-scheme:dark;--bg:#0b0d10;--panel:#15191f;--line:#2b323b;--lime:#a8f46c;--text:#f5f7f8;--muted:#9ba4ae}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(850px 460px at 75% -18%,#263b29 0%,transparent 60%),var(--bg);font-family:Inter,system-ui,-apple-system,sans-serif;color:var(--text)}
+main{max-width:900px;margin:auto;padding:28px 18px 70px}.nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:58px}.brand{font-size:24px;font-weight:900;letter-spacing:-1px}.brand span,h1 em{color:var(--lime);font-style:normal}.tag{border:1px solid #40563b;color:var(--lime);border-radius:99px;padding:8px 12px;font-size:12px}
+.hero{text-align:center;margin-bottom:30px}.eyebrow{font-size:12px;letter-spacing:2px;color:var(--lime);font-weight:800}.hero h1{font-size:clamp(38px,7vw,68px);line-height:1;letter-spacing:-3px;margin:17px 0}.hero p{color:var(--muted);max-width:600px;margin:auto;line-height:1.6}
+.card{max-width:700px;margin:auto;background:linear-gradient(180deg,#191e25,#13171c);border:1px solid var(--line);border-radius:23px;padding:24px;box-shadow:0 28px 85px #0006}
+.label{font-size:14px;font-weight:750;margin:0 0 10px}.input,select{width:100%;padding:15px;background:#0b0f13;border:1px solid #38414b;border-radius:12px;color:#fff;font-size:16px;outline:none}.input:focus,select:focus{border-color:var(--lime);box-shadow:0 0 0 3px #a8f46c20}.help{font-size:13px;line-height:1.5;color:var(--muted);margin:9px 0 0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px}.field label{display:block;color:var(--muted);font-size:13px;margin:0 0 8px}
+.btn{width:100%;padding:16px;border:0;border-radius:13px;background:var(--lime);color:#15200f;font-weight:850;font-size:16px;margin-top:20px;cursor:pointer}.btn:disabled{opacity:.55;cursor:wait}.secondary{padding:10px 12px;border:1px solid var(--line);background:#10151a;color:#cbd2d9;border-radius:10px;cursor:pointer}
+details{margin-top:19px;border-top:1px solid var(--line);padding-top:15px}summary{cursor:pointer;color:#dfe5e9;font-size:13px;font-weight:700}details .input{margin-top:12px}.smallbtn{margin-top:10px}
+.status{display:none;margin-top:16px;border:1px solid #40583a;background:#192218;color:#e0f8d5;border-radius:12px;padding:14px;line-height:1.5;font-size:14px;white-space:pre-wrap}.status.show{display:block}.status.error{border-color:#744444;background:#241818;color:#ffc1c1}
+.result{border:1px solid var(--line);border-radius:13px;padding:14px;margin-top:11px;background:#0d1217}.result a{color:var(--lime);text-decoration:none;font-weight:750}.result small{display:block;color:var(--muted);margin:5px 0 9px}
+.features{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:700px;margin:18px auto}.feature{border:1px solid var(--line);background:#11161b;border-radius:15px;padding:15px}.feature b{display:block;margin:6px 0}.feature p{font-size:12px;line-height:1.5;color:var(--muted);margin:0}.foot{text-align:center;color:#707983;font-size:12px;margin-top:28px;line-height:1.5}
+@media(max-width:600px){main{padding:19px 13px 50px}.nav{margin-bottom:40px}.card{padding:17px}.grid,.features{grid-template-columns:1fr}.hero h1{letter-spacing:-1.8px}}
+</style>
+</head>
+<body>
+<main>
+<header class="nav"><div class="brand">Clip<span>Pilot</span></div><div class="tag">YOUTUBE → SHORTS</div></header>
+<section class="hero"><div class="eyebrow">LINK REIN. CLIPS RAUS.</div><h1>Dein Video.<br><em>Die Highlights.</em></h1><p>Füge einen YouTube-Link ein. ClipPilot sucht interessante Momente, schneidet Hochkant-Clips und erstellt automatisch Untertitel.</p></section>
 <section class="card">
-<p class="label">Verarbeitungsmodus</p><div class="modes">
-<button class="mode active" id="macMode"><span>💻</span><strong>Mac · Pro-Modus</strong><small>Lokaler Server, Whisper-Transkription, automatische Highlights und FFmpeg-Export.</small></button>
-<button class="mode" id="phoneMode"><span>📱</span><strong>iPhone · Sparmodus</strong><small>Leichtgewichtige mobile Ansicht. Für unabhängige Verarbeitung auf dem iPhone ist die mobile Engine noch experimentell.</small></button>
+<p class="label" for="url">YouTube-Link</p>
+<input id="url" class="input" type="url" placeholder="https://www.youtube.com/watch?v=..." autocomplete="url" autocapitalize="off">
+<p class="help">Du musst die Videodatei nicht selbst herunterladen oder hochladen. ClipPilot ruft das Video automatisch ab. Öffentlich erreichbare Videos funktionieren am besten.</p>
+<div class="grid">
+<div class="field"><label for="count">Anzahl der Clips</label><select id="count"><option value="1">1 Clip</option><option value="3" selected>3 Clips</option><option value="5">5 Clips</option></select></div>
+<div class="field"><label for="duration">Länge pro Clip</label><select id="duration"><option value="30">30 Sekunden</option><option value="45" selected>45 Sekunden</option><option value="60">60 Sekunden</option></select></div>
 </div>
-<div id="macPanel"><p class="label">Video-Link (YouTube/Twitch, experimentell)</p><input class="input" id="macLink" placeholder="https://www.youtube.com/watch?v=..."><p class="help">Alternativ kannst du eine Videodatei auswählen. Link-Abruf klappt nicht bei jedem Video (privat, geschützt, Live, etc.). Nutze nur Inhalte, die du bearbeiten darfst.</p><p class="label">Oder Videodatei auswählen</p><input class="file" id="video" type="file" accept="video/*"></div>
-<div id="phonePanel" class="hidden"><p class="label">Mobiler Sparmodus</p><input class="file" id="phoneVideo" type="file" accept="video/*"><p class="help">iPhone-Safari hat strenge Speicher-/Rechenlimits. Diese mobile Version kann Dateien auswählen, aber automatische KI-Transkription und Videoexport direkt auf dem iPhone sind noch nicht aktiviert. Wenn du im selben WLAN bist, kannst du optional den Mac-Server verbinden.</p><label class="field"><span style="color:var(--muted)">Mac-Server im WLAN (optional)</span><input id="serverUrl" class="input" placeholder="http://192.168.1.20:8765"></label><label class="field" style="margin-top:12px"><span style="display:block;color:var(--muted);font-size:13px;margin-bottom:8px">Server-Token</span><input id="phoneToken" class="input" type="password" placeholder="Token vom Mac-Terminal"></label></div>
-<div class="grid"><div class="field"><label>Clip-Anzahl</label><select id="count"><option value="1">1 Clip</option><option value="3">3 Clips</option><option value="5" selected>5 Clips</option></select></div><div class="field"><label>Clip-Länge</label><select id="duration"><option value="30">30 Sekunden</option><option value="45" selected>45 Sekunden</option><option value="60">60 Sekunden</option></select></div><div class="field"><label>KI-Modell (Mac)</label><select id="model"><option value="tiny">Tiny · schnell</option><option value="base" selected>Base · empfohlen</option><option value="small">Small · genauer</option></select></div></div>
-<label class="field" style="margin-top:16px"><span style="display:block;color:var(--muted);font-size:13px;margin-bottom:8px">Lokaler Server-Token</span><input id="token" class="input" type="password" placeholder="Token aus dem Mac-Terminal"></label><button id="go" class="btn">✦ Lokale Clips erstellen</button><div id="status" class="status"></div><div id="results"></div></section>
-<section class="features"><div class="feature"><span>✦</span><b>Lokale Highlight-Auswahl</b><p>Transkript-basierte Bewertung von Reaktionen, Schlüsselwörtern und Sprechdichte.</p></div><div class="feature"><span>▤</span><b>Untertitel</b><p>Automatische Whisper-Transkription und eingebrannte SRT-Titel.</p></div><div class="feature"><span>▣</span><b>Shorts-Export</b><p>9:16 MP4. Mac verarbeitet lokal; iPhone-Sparmodus bleibt schlank.</p></div></section><footer class="foot">ClipPilot Local · Videos bleiben auf deinem Gerät (Mac-Modus) · Kein Cloud-Upload</footer></main>
+<details id="setup"><summary>Einmalige Verbindung einrichten / Token ändern</summary>
+<input id="token" class="input" type="password" placeholder="Token aus dem ClipPilot-Terminal" autocomplete="off">
+<p class="help">Das Token findest du im Terminal, in dem ClipPilot läuft. Es wird nach erfolgreicher Prüfung nur in diesem Browser gespeichert.</p>
+<button id="save" class="secondary smallbtn" type="button">Verbindung prüfen und speichern</button>
+<button id="clear" class="secondary smallbtn" type="button">Gespeichertes Token löschen</button>
+</details>
+<button id="go" class="btn">✦ Highlights erstellen</button>
+<div id="status" class="status">Bereit. Füge einen YouTube-Link ein.</div><div id="results"></div>
+</section>
+<section class="features">
+<div class="feature"><b>✦ Highlights</b><p>Automatische Auswahl anhand von Sprache, Reaktionen und inhaltlichen Signalen.</p></div>
+<div class="feature"><b>▤ Untertitel</b><p>Spracherkennung und eingebrannte Untertitel.</p></div>
+<div class="feature"><b>▣ Hochkant</b><p>Export als vertikale 9:16 MP4-Clips.</p></div>
+</section>
+<footer class="foot">ClipPilot verarbeitet lokal auf deinem Mac. Keine Cloud-Verarbeitung.<br>Nutze nur Videos, die du selbst erstellt hast oder bearbeiten darfst. YouTube-Zugriffsbeschränkungen werden nicht umgangen.</footer>
+</main>
 <script>
-const API='http://127.0.0.1:8765', $=id=>document.getElementById(id);let mode='mac';
-function setMode(m){mode=m;$('macMode').classList.toggle('active',m==='mac');$('phoneMode').classList.toggle('active',m==='phone');$('macPanel').classList.toggle('hidden',m!=='mac');$('phonePanel').classList.toggle('hidden',m!=='phone');$('go').textContent=m==='mac'?'✦ Lokale Clips erstellen':'✦ Mobile Verarbeitung';}
-$('macMode').onclick=()=>setMode('mac');$('phoneMode').onclick=()=>setMode('phone');
-async function check(){try{const r=await fetch(API+'/api/health',{mode:'cors'});if(r.ok){const d=await r.json();$('connection').textContent='LOCAL · CONNECTED';$('connection').style.color='var(--lime)';return true}}catch{}$('connection').textContent='LOCAL · SERVER OFF';$('connection').style.color='#ffbf69';return false}
-check();
-$('go').onclick=async()=>{const st=$('status'),btn=$('go');st.classList.add('show');$('results').innerHTML='';if(mode==='phone'){const f=$('phoneVideo').files[0];if(!f){st.textContent='Bitte wähle zuerst eine Videodatei auf deinem iPhone.';return}const target=$('serverUrl').value.trim();if(!target){st.textContent='Mobile Dateiauswahl funktioniert. Für automatische Clips ist die mobile Engine noch experimentell. Wenn dein Mac im selben WLAN läuft, gib seine lokale Serveradresse ein und nutze die Verbindung.';return}st.textContent='Verbinde zum Mac-Server…';try{const endpoint=target.replace(/\/$/,'')+'/api/process';const fd=new FormData();fd.append('video',f);fd.append('count',$('count').value);fd.append('duration',$('duration').value);fd.append('model','tiny');const r=await fetch(endpoint,{method:'POST',headers:{'X-ClipPilot-Token':$('phoneToken').value.trim()},body:fd});if(!r.ok)throw new Error(await r.text());const d=await r.json();showResults(d,target);st.textContent='Mobile Datei an deinen Mac im WLAN gesendet und verarbeitet.'}catch(e){st.textContent='Verbindung fehlgeschlagen: '+e.message+'\nPrüfe, ob Mac und iPhone im selben WLAN sind und der Server gestartet ist.'}return}
-const f=$('video').files[0],link=$('macLink').value.trim();if(!f&&!link){st.textContent='Bitte Video-Link einfügen oder Videodatei auswählen.';return}if(!await check()){st.textContent='Der lokale ClipPilot-Server läuft noch nicht. Installiere die Mac-Komponenten aus dem GitHub-Ordner und starte Start_ClipPilot.command. Danach diese Seite erneut laden.';return}
-btn.disabled=true;st.textContent='Video wird lokal transkribiert und Highlights werden gesucht. Das kann je nach Länge einige Minuten dauern…';
-try{const token=$('token').value.trim();if(!token){st.textContent='Bitte trage den Token aus dem Mac-Terminal ein.';btn.disabled=false;return}const fd=new FormData();fd.append('count',$('count').value);fd.append('duration',$('duration').value);fd.append('model',$('model').value);if(link){fd.append('url',link);st.textContent='Link wird lokal am Mac abgerufen und verarbeitet. Das kann einige Minuten dauern…';}else{fd.append('video',f);}const r=await fetch(API+(link?'/api/process-link':'/api/process'),{method:'POST',headers:{'X-ClipPilot-Token':token},body:fd});if(!r.ok)throw new Error(await r.text());const d=await r.json();st.textContent='Fertig! '+d.clips.length+' Clips wurden lokal erstellt.';showResults(d,API)}catch(e){st.textContent='Verarbeitung fehlgeschlagen: '+e.message+'\nServer und FFmpeg prüfen.'}finally{btn.disabled=false}};
-function showResults(d,base){$('results').innerHTML=(d.clips||[]).map(c=>'<div class="result"><b>'+escapeHtml(c.name)+'</b> · '+escapeHtml(c.duration)+'s<br><a href="'+base+'/api/download/'+encodeURIComponent(c.file)+'" target="_blank" rel="noopener">MP4 ansehen / speichern</a></div>').join('')}
-function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-if("serviceWorker" in navigator){navigator.serviceWorker.register("./sw.js").catch(()=>{})}\n</script></body></html>
+const $=id=>document.getElementById(id);
+const API=location.origin;
+const TOKEN_KEY="clippilot_link_token_v2";
+function validYouTubeUrl(value){
+ try{const u=new URL(value);const hosts=["youtube.com","www.youtube.com","m.youtube.com","music.youtube.com","youtu.be"];return u.protocol==="https:"&&hosts.includes(u.hostname.toLowerCase())&&!u.pathname.startsWith("/redirect")}
+ catch{return false}
+}
+function setStatus(message,error=false){$("status").textContent=message;$("status").classList.add("show");$("status").classList.toggle("error",error)}
+function getToken(){return $("token").value.trim()||localStorage.getItem(TOKEN_KEY)||""}
+$("token").value=localStorage.getItem(TOKEN_KEY)||"";
+if(!$("token").value)$("setup").open=true;
+async function testAndSaveToken(){
+ const token=getToken();if(!token){$("setup").open=true;setStatus("Bitte zuerst das Token aus dem ClipPilot-Terminal eintragen.",true);return false}
+ try{
+  const response=await fetch(API+"/api/health",{headers:{"X-ClipPilot-Token":token}});
+  if(!response.ok)throw new Error(response.status===401?"Token ist falsch. Bitte im Mac-Terminal nachsehen.":"ClipPilot antwortet nicht.");
+  localStorage.setItem(TOKEN_KEY,token);$("token").value=token;$("setup").open=false;setStatus("Verbindung gespeichert. Ab jetzt reicht der YouTube-Link.",false);return true;
+ }catch(error){setStatus("Verbindung fehlgeschlagen: "+error.message+"\nÖffne diese Seite über http://127.0.0.1:8765, während ClipPilot auf deinem Mac läuft.",true);return false}
+}
+$("save").addEventListener("click",testAndSaveToken);
+$("clear").addEventListener("click",()=>{localStorage.removeItem(TOKEN_KEY);$("token").value="";$("setup").open=true;setStatus("Gespeichertes Token wurde aus diesem Browser entfernt.")});
+$("go").addEventListener("click",async()=>{
+ const url=$("url").value.trim(),token=getToken(),button=$("go");
+ $("results").innerHTML="";
+ if(!validYouTubeUrl(url)){setStatus("Bitte einen gültigen YouTube-Link mit https:// einfügen.",true);return}
+ if(!token){$("setup").open=true;setStatus("Einmalig das Token aus dem ClipPilot-Terminal eintragen. Danach musst du es nicht erneut eingeben.",true);return}
+ button.disabled=true;setStatus("Verbindung wird geprüft…");
+ try{
+  const health=await fetch(API+"/api/health",{headers:{"X-ClipPilot-Token":token}});
+  if(!health.ok)throw new Error(health.status===401?"Token ist falsch. Öffne „Einmalige Verbindung“ und prüfe es.":"ClipPilot-Server ist nicht erreichbar.");
+  localStorage.setItem(TOKEN_KEY,token);
+  const form=new FormData();form.append("url",url);form.append("count",$("count").value);form.append("duration",$("duration").value);form.append("model","base");
+  setStatus("YouTube-Link wird abgerufen. Danach sucht ClipPilot Highlights, erstellt Untertitel und rendert die Clips. Je nach Videolänge kann das mehrere Minuten dauern. Bitte die Seite geöffnet lassen.");
+  const response=await fetch(API+"/api/process-link",{method:"POST",headers:{"X-ClipPilot-Token":token},body:form});
+  let data;try{data=await response.json()}catch{throw new Error("Die Serverantwort konnte nicht gelesen werden.")}
+  if(!response.ok)throw new Error(data.detail||"Die Verarbeitung ist fehlgeschlagen.");
+  const clips=data.clips||[];if(!clips.length)throw new Error("Es wurden keine Clips erstellt.");
+  clips.forEach((clip,index)=>{
+   const card=document.createElement("div");card.className="result";
+   const title=document.createElement("b");title.textContent=(clip.name||"Highlight "+(index+1))+" · "+clip.duration+" s";
+   const meta=document.createElement("small");meta.textContent="9:16-Hochkantclip mit Untertiteln";
+   const link=document.createElement("a");link.textContent="MP4 ansehen / speichern ↗";link.href=API+"/api/download/"+String(clip.file).split("/").map(encodeURIComponent).join("/");link.target="_blank";link.rel="noopener";
+   card.append(title,meta,link);$("results").appendChild(card);
+  });
+  setStatus("Fertig! "+clips.length+" Clip(s) wurden erstellt.");
+ }catch(error){setStatus("Fehler: "+error.message,true)}
+ finally{button.disabled=false}
+});
+</script>
+</body></html>
