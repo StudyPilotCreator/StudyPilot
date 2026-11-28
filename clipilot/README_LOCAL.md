@@ -52,10 +52,11 @@ Optional: Safari → Teilen → Zum Home-Bildschirm, um ClipPilot wie eine App z
 
 ## Verarbeitung und Qualität
 
-- YouTube-Linkabruf über yt-dlp mit Deno als JavaScript-Laufzeit und EJS-Zusatzkomponenten.
-- Transkription mit faster-whisper auf dem Mac.
-- Automatische Highlight-Bewertung anhand von Sprachdichte, Reaktionen, Wendungen und Textsignalen.
-- Export als 9:16-MP4 mit eingebrannten Untertiteln.
+- YouTube-Linkabruf über yt-dlp mit Deno als JavaScript-Laufzeit und EJS-Zusatzkomponenten; bevorzugt wird Quellmaterial bis 1080p.
+- Transkription mit faster-whisper und Wort-Zeitstempeln auf dem Mac.
+- Hook-orientierte Highlight-Bewertung: Die ersten Sekunden, Reaktionen, Fragen und Wendungen bekommen zusätzliches Gewicht; die stärkste Auswahl wird als Clip 1 ausgegeben.
+- Kurze, einzeilige Untertitelgruppen mit kleinerer Schrift, dunkler Kontur und unterer Safe-Area-Position.
+- 9:16-MP4-Export mit höherer H.264-Bildqualität (CRF 20, medium) und 160-kbit/s-Audio.
 - Standardauswahl: 3 Clips mit je 45 Sekunden.
 
 Die Highlight-Auswahl ist eine automatische Heuristik und versteht nicht jedes Video vollständig. Sie garantiert keine viralen Clips. Prüfe die Ergebnisse vor dem Veröffentlichen.
