@@ -7,6 +7,7 @@ import os
 import re
 import secrets
 import subprocess
+import shutil
 from pathlib import Path
 from typing import Optional
 from urllib.parse import urlsplit
@@ -95,7 +96,19 @@ def mobile_page():
 @app.get("/api/health")
 def health(x_clippilot_token: Optional[str] = Header(None)):
     auth(x_clippilot_token)
-    return {"ok": True, "service": "ClipPilot", "version": "0.2", "link_only": True}
+    try:
+        import yt_dlp
+        yt_dlp_version = yt_dlp.version.__version__
+    except Exception:
+        yt_dlp_version = "unavailable"
+    return {
+        "ok": True,
+        "service": "ClipPilot",
+        "version": "0.3",
+        "link_only": True,
+        "yt_dlp_version": yt_dlp_version,
+        "deno_available": bool(shutil.which("deno")),
+    }
 
 
 def safe_filename(name: str) -> str:
@@ -374,11 +387,26 @@ async def process_link(
         raise
     except Exception as exc:
         message = str(exc)
+        lower_message = message.lower()
+        if "page needs to be reloaded" in lower_message or "javascript challenge" in lower_message:
+            explanation = (
+                "YouTube hat die aktuelle Player-/JavaScript-Prüfung abgewiesen. "
+                "Bitte ClipPilot mit Update_ClipPilot.command aktualisieren und neu starten. "
+                "Falls der Fehler bleibt, kann YouTube den Abruf dieses Videos oder der Verbindung vorübergehend blockieren."
+            )
+        elif "sign in to confirm" in lower_message or "age-restricted" in lower_message:
+            explanation = (
+                "YouTube verlangt eine Anmeldung oder Altersbestätigung. "
+                "ClipPilot kann diese Zugangsbeschränkung nicht umgehen. Bitte einen anderen öffentlich erreichbaren Link testen."
+            )
+        else:
+            explanation = (
+                "Der YouTube-Link konnte nicht verarbeitet werden. Prüfe, ob das Video öffentlich erreichbar ist. "
+                "Private, geschützte oder zugangsbeschränkte Videos werden nicht freigeschaltet."
+            )
         raise HTTPException(
             422,
-            "Der YouTube-Link konnte nicht verarbeitet werden. Prüfe, ob das Video öffentlich erreichbar ist. "
-            "Private, geschützte oder alters-/regionsbeschränkte Videos werden nicht freigeschaltet. "
-            f"Technischer Hinweis: {message[:350]}",
+            f"{explanation} Technischer Hinweis: {message[:350]}",
         ) from exc
     finally:
         for item in INBOX.glob(temporary_prefix.name + ".*"):
