@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 cd "$(dirname "$0")"
+export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
 
 if [ ! -x .venv/bin/python ]; then
   echo "Bitte zuerst Install_ClipPilot.command ausführen."
@@ -19,6 +20,10 @@ if [ -n "$MAC_IP" ]; then
 else
   echo "iPhone-Seite: http://MAC-IP:8765/mobile"
 fi
+echo ""
+echo "YouTube-Engine:"
+./.venv/bin/python -m yt_dlp --version || true
+deno --version | head -n 1 || true
 echo ""
 echo "Das Verbindungstoken wird gleich hier angezeigt."
 echo "Einmal in der ClipPilot-Seite eintragen und speichern."
