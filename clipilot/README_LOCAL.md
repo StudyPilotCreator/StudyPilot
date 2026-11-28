@@ -66,6 +66,7 @@ Die Highlight-Auswahl ist eine automatische Heuristik und versteht nicht jedes V
 - **Server nicht erreichbar:** Prüfen, ob das Start-Terminal noch läuft. Auf dem iPhone müssen beide Geräte im selben WLAN sein.
 - **YouTube-Seite muss neu geladen werden / JavaScript-Prüfung scheitert:** Update_ClipPilot.command ausführen, danach den Server neu starten. Wenn YouTube die Verbindung oder das Video weiter blockiert, wird das nicht umgangen.
 - **Anmeldung oder Altersbestätigung erforderlich:** Dieses Video kann ClipPilot nicht abrufen. Einen anderen öffentlich erreichbaren Link testen.
+- **Fehler mit metadata_errors:** Das ist eine PyAV/faster-whisper-Versionsunverträglichkeit. Update_ClipPilot.command ausführen; das pinnt PyAV auf eine kompatible Version unter 19.
 - **FFmpeg fehlt:** bash Install_ClipPilot.command erneut ausführen.
 
 ## Sicherheit
