@@ -413,9 +413,14 @@ async def process_link(
             "no_warnings": True,
             "noplaylist": True,
             "max_filesize": 500 * 1024 * 1024,
-            "socket_timeout": 30,
-            "retries": 2,
-            "fragment_retries": 2,
+            "socket_timeout": 60,
+            # Googlevideo delivery hosts can have temporary DNS/network failures.
+            # Retry more generously and prefer IPv4 on networks with unreliable IPv6 routing.
+            "retries": 10,
+            "fragment_retries": 10,
+            "extractor_retries": 5,
+            "force_ipv4": True,
+            "sleep_interval_requests": 1,
         }
         with yt_dlp.YoutubeDL(options) as downloader:
             downloader.download([youtube_url])
@@ -445,6 +450,13 @@ async def process_link(
                 "YouTube hat die aktuelle Player-/JavaScript-Prüfung abgewiesen. "
                 "Bitte ClipPilot mit Update_ClipPilot.command aktualisieren und neu starten. "
                 "Falls der Fehler bleibt, kann YouTube den Abruf dieses Videos oder der Verbindung vorübergehend blockieren."
+            )
+        elif "failed to resolve" in lower_message or "name or service not known" in lower_message or "nodename nor servname" in lower_message:
+            explanation = (
+                "Dein Mac konnte den YouTube-Videoserver (googlevideo.com) gerade nicht per DNS finden. "
+                "ClipPilot versucht Downloads jetzt öfter und bevorzugt IPv4. "
+                "Wenn der Fehler bleibt: WLAN kurz trennen und verbinden, VPN/Proxy testweise ausschalten "
+                "und denselben Link danach erneut versuchen."
             )
         elif "sign in to confirm" in lower_message or "age-restricted" in lower_message:
             explanation = (
