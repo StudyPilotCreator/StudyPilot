@@ -64,7 +64,7 @@ async function testAndSaveToken(){
  try{
   const response=await fetch(API+"/api/health",{headers:{"X-ClipPilot-Token":token}});
   if(!response.ok)throw new Error(response.status===401?"Token ist falsch. Bitte im Mac-Terminal prüfen.":"ClipPilot antwortet nicht.");
-  const info=await response.json();localStorage.setItem(TOKEN_KEY,token);$("token").value=token;$("setup").open=false;const engine=info.yt_dlp_version&&info.yt_dlp_version!=="unavailable"?"yt-dlp "+info.yt_dlp_version:"yt-dlp bereit";const js=info.deno_available?"Deno bereit":"Deno nicht gefunden – Server neu starten";setStatus("Verbindung gespeichert. "+engine+" · "+js+". Beim nächsten Mal reicht der YouTube-Link.",!info.deno_available);return true;
+  const info=await response.json();localStorage.setItem(TOKEN_KEY,token);$("token").value=token;$("setup").open=false;const engine=info.yt_dlp_version&&info.yt_dlp_version!=="unavailable"?"yt-dlp "+info.yt_dlp_version:"yt-dlp bereit";const js=info.deno_available?"Deno bereit":"Deno nicht gefunden – Server neu starten";const sub=info.ffmpeg_subtitles_available?"FFmpeg-Untertitel bereit":"FFmpeg-Untertitelfilter fehlt – Update ausführen";setStatus("Verbindung gespeichert. "+engine+" · "+js+" · "+sub+". Beim nächsten Mal reicht der YouTube-Link.",!info.deno_available||!info.ffmpeg_subtitles_available);return true;
  }catch(error){setStatus("Verbindung fehlgeschlagen: "+error.message+"\nÖffne http://MAC-IP:8765/mobile. Mac und iPhone müssen im selben WLAN sein.",true);return false}
 }
 $("save").addEventListener("click",testAndSaveToken);
@@ -80,7 +80,7 @@ $("go").addEventListener("click",async()=>{
   const health=await fetch(API+"/api/health",{headers:{"X-ClipPilot-Token":token}});
   if(!health.ok)throw new Error(health.status===401?"Token ist falsch. Öffne die einmalige Verbindungseinrichtung.":"ClipPilot-Server ist nicht erreichbar.");
   const engineInfo=await health.json();
-  if(!engineInfo.deno_available)throw new Error("Deno wurde nicht gefunden. Bitte ClipPilot auf dem Mac mit Start_ClipPilot.command neu starten.");
+  if(!engineInfo.deno_available)throw new Error("Deno wurde nicht gefunden. Bitte ClipPilot auf dem Mac mit Start_ClipPilot.command neu starten.");if(!engineInfo.ffmpeg_subtitles_available)throw new Error("FFmpeg-Untertitelfilter fehlt. Bitte Update_ClipPilot.command ausführen und ClipPilot neu starten.");
   localStorage.setItem(TOKEN_KEY,token);
   const form=new FormData();form.append("url",url);form.append("count",$("count").value);form.append("duration",$("duration").value);form.append("model","base");
   setStatus("YouTube-Link wird abgerufen. ClipPilot sucht Highlights, erstellt Untertitel und rendert die Clips. Je nach Videolänge kann das mehrere Minuten dauern. Bitte diese Seite geöffnet lassen.");
