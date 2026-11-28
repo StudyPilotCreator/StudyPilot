@@ -101,13 +101,29 @@ def health(x_clippilot_token: Optional[str] = Header(None)):
         yt_dlp_version = yt_dlp.version.__version__
     except Exception:
         yt_dlp_version = "unavailable"
+    ffmpeg_bin = shutil.which("ffmpeg")
+    subtitles_available = False
+    if ffmpeg_bin:
+        try:
+            filters = subprocess.run(
+                [ffmpeg_bin, "-hide_banner", "-filters"],
+                capture_output=True, text=True, timeout=15
+            )
+            subtitles_available = (
+                filters.returncode == 0
+                and re.search(r"\\bsubtitles\\b", filters.stdout) is not None
+            )
+        except Exception:
+            subtitles_available = False
     return {
         "ok": True,
         "service": "ClipPilot",
-        "version": "0.3",
+        "version": "0.4",
         "link_only": True,
         "yt_dlp_version": yt_dlp_version,
         "deno_available": bool(shutil.which("deno")),
+        "ffmpeg_path": ffmpeg_bin,
+        "ffmpeg_subtitles_available": subtitles_available,
     }
 
 
