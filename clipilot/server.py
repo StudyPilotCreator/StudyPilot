@@ -334,6 +334,12 @@ def process_source(source: Path, count: int, duration: int, model_name: str):
     except FileNotFoundError as exc:
         raise HTTPException(500, "FFmpeg/FFprobe fehlt. Bitte ClipPilot-Installation erneut ausführen.") from exc
     except Exception as exc:
+        if "metadata_errors" in str(exc):
+            raise HTTPException(
+                500,
+                "Die Audio-Bibliothek ist nicht kompatibel. Bitte ClipPilot mit Update_ClipPilot.command aktualisieren; "
+                "dadurch wird PyAV auf eine kompatible Version unter 19 gesetzt."
+            ) from exc
         raise HTTPException(500, f"Verarbeitung fehlgeschlagen: {exc}") from exc
 
 
