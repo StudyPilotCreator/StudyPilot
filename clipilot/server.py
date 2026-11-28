@@ -56,6 +56,25 @@ ALLOWED_YOUTUBE_HOSTS = {
     "music.youtube.com",
     "youtu.be",
 }
+def resolve_homebrew_ffmpeg_tool(tool: str) -> Optional[str]:
+    """Prefer Homebrew's keg-only ffmpeg-full; fall back to PATH."""
+    brew = shutil.which("brew") or "/opt/homebrew/bin/brew"
+    try:
+        prefix = subprocess.run(
+            [brew, "--prefix", "ffmpeg-full"],
+            capture_output=True, text=True, timeout=10, check=True
+        ).stdout.strip()
+        candidate = Path(prefix) / "bin" / tool
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    except Exception:
+        pass
+    return shutil.which(tool)
+
+
+FFMPEG_BIN = resolve_homebrew_ffmpeg_tool("ffmpeg")
+FFPROBE_BIN = resolve_homebrew_ffmpeg_tool("ffprobe")
+
 WHISPER_MODEL: Optional[WhisperModel] = None
 WHISPER_MODEL_NAME: Optional[str] = None
 
@@ -101,7 +120,7 @@ def health(x_clippilot_token: Optional[str] = Header(None)):
         yt_dlp_version = yt_dlp.version.__version__
     except Exception:
         yt_dlp_version = "unavailable"
-    ffmpeg_bin = shutil.which("ffmpeg")
+    ffmpeg_bin = FFMPEG_BIN
     subtitles_available = False
     if ffmpeg_bin:
         try:
@@ -283,7 +302,7 @@ def process_source(source: Path, count: int, duration: int, model_name: str):
     try:
         probe = subprocess.run(
             [
-                "ffprobe", "-v", "error", "-show_entries", "format=duration",
+                FFPROBE_BIN or "ffprobe", "-v", "error", "-show_entries", "format=duration",
                 "-of", "json", str(source),
             ],
             capture_output=True, text=True, check=True,
@@ -326,7 +345,7 @@ def process_source(source: Path, count: int, duration: int, model_name: str):
                 )
 
             command = [
-                "ffmpeg", "-y", "-ss", str(start), "-i", str(source),
+                FFMPEG_BIN or "ffmpeg", "-y", "-ss", str(start), "-i", str(source),
                 "-t", str(end - start), "-vf", video_filter,
                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "24",
                 "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
