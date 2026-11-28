@@ -35,6 +35,8 @@ fi
 
 ./.venv/bin/python -m pip install --upgrade pip
 ./.venv/bin/python -m pip install --upgrade -r requirements.txt "yt-dlp[default]"
+# Explicitly replace any pre-existing PyAV 19 installation.
+./.venv/bin/python -m pip install --force-reinstall --no-cache-dir "av==18.1.0"
 
 echo ""
 echo "Update abgeschlossen."
