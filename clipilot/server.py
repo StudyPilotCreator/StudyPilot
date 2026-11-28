@@ -137,7 +137,7 @@ def health(x_clippilot_token: Optional[str] = Header(None)):
     return {
         "ok": True,
         "service": "ClipPilot",
-        "version": "0.4",
+        "version": "0.5",
         "link_only": True,
         "yt_dlp_version": yt_dlp_version,
         "deno_available": bool(shutil.which("deno")),
@@ -524,7 +524,7 @@ async def process_link(
         import yt_dlp
 
         options = {
-            "format": "best[height<=720]/best",
+            "format": "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
             "outtmpl": output_template,
             "merge_output_format": "mp4",
             "quiet": True,
