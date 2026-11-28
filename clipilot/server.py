@@ -316,7 +316,14 @@ def process_source(source: Path, count: int, duration: int, model_name: str):
                 "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
                 str(clip_path),
             ]
-            subprocess.run(command, check=True, capture_output=True)
+            encoded = subprocess.run(command, capture_output=True, text=True)
+            if encoded.returncode != 0:
+                details = (encoded.stderr or encoded.stdout or "Unbekannter FFmpeg-Fehler").strip()
+                raise HTTPException(
+                    500,
+                    "FFmpeg konnte den Clip nicht exportieren. Technische Meldung: "
+                    + details[-1800:]
+                )
             results.append({
                 "name": f"Highlight {index}",
                 "duration": round(end - start, 1),
@@ -332,7 +339,11 @@ def process_source(source: Path, count: int, duration: int, model_name: str):
     except HTTPException:
         raise
     except FileNotFoundError as exc:
-        raise HTTPException(500, "FFmpeg/FFprobe fehlt. Bitte ClipPilot-Installation erneut ausführen.") from exc
+        raise HTTPException(
+            500,
+            "FFmpeg oder FFprobe wurde nicht gefunden. Bitte Update_ClipPilot.command ausführen "
+            "und danach Start_ClipPilot.command erneut starten."
+        ) from exc
     except Exception as exc:
         if "metadata_errors" in str(exc):
             raise HTTPException(
