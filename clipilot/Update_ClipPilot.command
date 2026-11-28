@@ -2,7 +2,7 @@
 set -e
 cd "$(dirname "$0")"
 
-export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
+export PATH="/opt/homebrew/opt/ffmpeg-full/bin:/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
 BASE="https://raw.githubusercontent.com/StudyPilotCreator/StudyPilot/main/clipilot"
 
 echo "ClipPilot wird aktualisiert..."
@@ -16,7 +16,8 @@ if ! command -v brew >/dev/null 2>&1; then
   exit 1
 fi
 
-brew install ffmpeg python@3.13 deno
+brew install ffmpeg-full python@3.13 deno
+export PATH="/opt/homebrew/opt/ffmpeg-full/bin:/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
 PYTHON_BIN="$(command -v python3.13 || true)"
 if [ -z "$PYTHON_BIN" ]; then
   echo "Python 3.13 wurde nicht gefunden."
@@ -42,5 +43,11 @@ echo ""
 echo "Update abgeschlossen."
 echo "yt-dlp-Version: $(./.venv/bin/python -m yt_dlp --version)"
 echo "Deno-Version: $(deno --version | head -n 1)"
+echo "FFmpeg-Version: $(ffmpeg -version | head -n 1)"
+if ! ffmpeg -hide_banner -filters 2>/dev/null | grep -Eq '[[:space:]]subtitles[[:space:]]'; then
+  echo "FEHLER: FFmpeg-full wurde gefunden, aber der Untertitelfilter fehlt."
+  exit 1
+fi
+echo "FFmpeg-Untertitelfilter: verfügbar"
 echo ""
 echo "Jetzt ClipPilot mit bash Start_ClipPilot.command neu starten."
