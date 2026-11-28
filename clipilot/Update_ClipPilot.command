@@ -2,7 +2,7 @@
 set -e
 cd "$(dirname "$0")"
 
-export PATH="/opt/homebrew/opt/ffmpeg-full/bin:/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
+export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
 BASE="https://raw.githubusercontent.com/StudyPilotCreator/StudyPilot/main/clipilot"
 
 echo "ClipPilot wird aktualisiert..."
@@ -17,7 +17,14 @@ if ! command -v brew >/dev/null 2>&1; then
 fi
 
 brew install ffmpeg-full python@3.13 deno
-export PATH="/opt/homebrew/opt/ffmpeg-full/bin:/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
+FFMPEG_FULL_PREFIX="$(brew --prefix ffmpeg-full 2>/dev/null || true)"
+if [ -n "$FFMPEG_FULL_PREFIX" ] && [ -x "$FFMPEG_FULL_PREFIX/bin/ffmpeg" ]; then
+  export PATH="$FFMPEG_FULL_PREFIX/bin:/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
+else
+  echo "FEHLER: Homebrew hat ffmpeg-full nicht gefunden."
+  brew info ffmpeg-full
+  exit 1
+fi
 PYTHON_BIN="$(command -v python3.13 || true)"
 if [ -z "$PYTHON_BIN" ]; then
   echo "Python 3.13 wurde nicht gefunden."
@@ -49,5 +56,6 @@ if ! ffmpeg -hide_banner -filters 2>/dev/null | grep -Eq '[[:space:]]subtitles[[
   exit 1
 fi
 echo "FFmpeg-Untertitelfilter: verfügbar"
+echo "Verwendetes FFmpeg: $(command -v ffmpeg)"
 echo ""
 echo "Jetzt ClipPilot mit bash Start_ClipPilot.command neu starten."
