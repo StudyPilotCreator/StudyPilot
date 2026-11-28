@@ -46,7 +46,7 @@ details{margin-top:19px;border-top:1px solid var(--line);padding-top:15px}summar
 <div class="feature"><b>▤ Untertitel</b><p>Spracherkennung und eingebrannte Untertitel.</p></div>
 <div class="feature"><b>▣ Hochkant</b><p>Export als vertikale 9:16 MP4-Clips.</p></div>
 </section>
-<footer class="foot">ClipPilot verarbeitet lokal auf deinem Mac. Keine Cloud-Verarbeitung.<br>Nutze nur Videos, die du selbst erstellt hast oder bearbeiten darfst. YouTube-Zugriffsbeschränkungen werden nicht umgangen.</footer>
+<footer class="foot">ClipPilot verarbeitet lokal auf deinem Mac. YouTube-Abruf: yt-dlp + Deno.<br>Dein Mac muss während der Verarbeitung eingeschaltet bleiben. Nutze nur Videos, die du selbst erstellt hast oder bearbeiten darfst.</footer>
 </main>
 <script>
 const $=id=>document.getElementById(id);
@@ -66,7 +66,7 @@ async function testAndSaveToken(){
  try{
   const response=await fetch(API+"/api/health",{headers:{"X-ClipPilot-Token":token}});
   if(!response.ok)throw new Error(response.status===401?"Token ist falsch. Bitte im Mac-Terminal nachsehen.":"ClipPilot antwortet nicht.");
-  localStorage.setItem(TOKEN_KEY,token);$("token").value=token;$("setup").open=false;setStatus("Verbindung gespeichert. Ab jetzt reicht der YouTube-Link.",false);return true;
+  const info=await response.json();localStorage.setItem(TOKEN_KEY,token);$("token").value=token;$("setup").open=false;const engine=info.yt_dlp_version&&info.yt_dlp_version!=="unavailable"?"yt-dlp "+info.yt_dlp_version:"yt-dlp bereit";const js=info.deno_available?"Deno bereit":"Deno nicht gefunden – Terminal neu starten";setStatus("Verbindung gespeichert. "+engine+" · "+js+". Ab jetzt reicht der YouTube-Link.",!info.deno_available);return true;
  }catch(error){setStatus("Verbindung fehlgeschlagen: "+error.message+"\nÖffne diese Seite über http://127.0.0.1:8765, während ClipPilot auf deinem Mac läuft.",true);return false}
 }
 $("save").addEventListener("click",testAndSaveToken);
@@ -80,6 +80,8 @@ $("go").addEventListener("click",async()=>{
  try{
   const health=await fetch(API+"/api/health",{headers:{"X-ClipPilot-Token":token}});
   if(!health.ok)throw new Error(health.status===401?"Token ist falsch. Öffne „Einmalige Verbindung“ und prüfe es.":"ClipPilot-Server ist nicht erreichbar.");
+  const engineInfo=await health.json();
+  if(!engineInfo.deno_available)throw new Error("Deno wurde nicht gefunden. Bitte ClipPilot mit Start_ClipPilot.command aus dem aktualisierten Ordner starten.");
   localStorage.setItem(TOKEN_KEY,token);
   const form=new FormData();form.append("url",url);form.append("count",$("count").value);form.append("duration",$("duration").value);form.append("model","base");
   setStatus("YouTube-Link wird abgerufen. Danach sucht ClipPilot Highlights, erstellt Untertitel und rendert die Clips. Je nach Videolänge kann das mehrere Minuten dauern. Bitte die Seite geöffnet lassen.");
