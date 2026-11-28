@@ -17,7 +17,7 @@ YouTube kann den Abruf bei privaten, geschützten, nur für Mitglieder verfügba
 
 ## Installation auf dem Mac
 
-Voraussetzung: macOS, Homebrew und Internetzugang. Das Installationsskript richtet FFmpeg, Python 3.13, Deno, yt-dlp und die yt-dlp-EJS-Zusatzkomponenten ein.
+Voraussetzung: macOS, Homebrew und Internetzugang. Das Installationsskript richtet ffmpeg-full (mit libass für eingebrannte Untertitel), Python 3.13, Deno, yt-dlp und die yt-dlp-EJS-Zusatzkomponenten ein.
 
 1. Lade das Repository von GitHub herunter oder klone es.
 2. Öffne im Terminal den Ordner clipilot.
@@ -67,7 +67,7 @@ Die Highlight-Auswahl ist eine automatische Heuristik und versteht nicht jedes V
 - **YouTube-Seite muss neu geladen werden / JavaScript-Prüfung scheitert:** Update_ClipPilot.command ausführen, danach den Server neu starten. Wenn YouTube die Verbindung oder das Video weiter blockiert, wird das nicht umgangen.
 - **Anmeldung oder Altersbestätigung erforderlich:** Dieses Video kann ClipPilot nicht abrufen. Einen anderen öffentlich erreichbaren Link testen.
 - **Fehler mit metadata_errors:** Das ist eine PyAV/faster-whisper-Versionsunverträglichkeit. Update_ClipPilot.command ausführen; das pinnt PyAV auf eine kompatible Version unter 19.
-- **FFmpeg fehlt:** bash Install_ClipPilot.command erneut ausführen.
+- **FFmpeg-/Untertitelfilter fehlt oder Export endet mit Fehler:** Update_ClipPilot.command ausführen. ClipPilot nutzt ffmpeg-full mit libass; das Startskript prüft den Untertitelfilter.
 
 ## Sicherheit
 
