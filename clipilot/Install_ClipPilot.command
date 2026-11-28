@@ -13,7 +13,10 @@ if ! command -v brew >/dev/null 2>&1; then
 fi
 
 brew install ffmpeg-full python@3.13 deno
-export PATH="/opt/homebrew/opt/ffmpeg-full/bin:/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
+FFMPEG_FULL_PREFIX="$(brew --prefix ffmpeg-full 2>/dev/null || true)"
+if [ -n "$FFMPEG_FULL_PREFIX" ] && [ -x "$FFMPEG_FULL_PREFIX/bin/ffmpeg" ]; then
+  export PATH="$FFMPEG_FULL_PREFIX/bin:/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
+fi
 
 PYTHON_BIN="$(command -v python3.13 || true)"
 if [ -z "$PYTHON_BIN" ]; then
@@ -44,6 +47,7 @@ if ! ffmpeg -hide_banner -filters 2>/dev/null | grep -Eq '[[:space:]]subtitles[[
   exit 1
 fi
 echo "FFmpeg-Untertitelfilter: verfügbar"
+echo "Verwendetes FFmpeg: $(command -v ffmpeg)"
 
 echo ""
 echo "Installation fertig."
