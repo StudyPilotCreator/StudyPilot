@@ -17,7 +17,7 @@ YouTube kann den Abruf bei privaten, geschützten, nur für Mitglieder verfügba
 
 ## Installation auf dem Mac
 
-Voraussetzung: macOS, Python 3 und Homebrew.
+Voraussetzung: macOS, Homebrew und Internetzugang. Das Installationsskript richtet FFmpeg, Python 3.13, Deno, yt-dlp und die yt-dlp-EJS-Zusatzkomponenten ein.
 
 1. Lade das Repository von GitHub herunter oder klone es.
 2. Öffne im Terminal den Ordner clipilot.
@@ -32,6 +32,13 @@ Voraussetzung: macOS, Python 3 und Homebrew.
 
 Beim ersten Start kann Whisper sein Sprachmodell herunterladen. Das ist nicht der Download des YouTube-Videos durch dich, sondern die lokale Spracherkennungs-Komponente.
 
+## Bestehende ClipPilot-Installation aktualisieren
+
+Wenn ClipPilot bereits auf deinem Mac installiert ist, stoppe zuerst den Server mit Control + C. Führe dann im ClipPilot-Ordner aus:
+   bash Update_ClipPilot.command
+
+Das Update lädt die aktuellen Programmdateien aus diesem Repository, prüft/erneuert die Python-Umgebung und installiert yt-dlp samt EJS-Komponenten. Danach mit bash Start_ClipPilot.command neu starten.
+
 ## Auf dem iPhone verwenden
 
 1. Mac und iPhone müssen im selben WLAN sein.
@@ -45,7 +52,7 @@ Optional: Safari → Teilen → Zum Home-Bildschirm, um ClipPilot wie eine App z
 
 ## Verarbeitung und Qualität
 
-- YouTube-Linkabruf über yt-dlp (kein manuelles Herunterladen durch dich).
+- YouTube-Linkabruf über yt-dlp mit Deno als JavaScript-Laufzeit und EJS-Zusatzkomponenten.
 - Transkription mit faster-whisper auf dem Mac.
 - Automatische Highlight-Bewertung anhand von Sprachdichte, Reaktionen, Wendungen und Textsignalen.
 - Export als 9:16-MP4 mit eingebrannten Untertiteln.
@@ -57,9 +64,9 @@ Die Highlight-Auswahl ist eine automatische Heuristik und versteht nicht jedes V
 
 - **Token falsch:** Token im Terminal erneut prüfen. In der Website lässt sich das gespeicherte Token löschen und neu eintragen.
 - **Server nicht erreichbar:** Prüfen, ob das Start-Terminal noch läuft. Auf dem iPhone müssen beide Geräte im selben WLAN sein.
-- **YouTube-Link fehlgeschlagen:** Prüfen, ob das Video öffentlich aufrufbar ist. ClipPilot unterstützt keine privaten oder zugangsbeschränkten Inhalte.
+- **YouTube-Seite muss neu geladen werden / JavaScript-Prüfung scheitert:** Update_ClipPilot.command ausführen, danach den Server neu starten. Wenn YouTube die Verbindung oder das Video weiter blockiert, wird das nicht umgangen.
+- **Anmeldung oder Altersbestätigung erforderlich:** Dieses Video kann ClipPilot nicht abrufen. Einen anderen öffentlich erreichbaren Link testen.
 - **FFmpeg fehlt:** bash Install_ClipPilot.command erneut ausführen.
-- **yt-dlp aktualisieren:** Im ClipPilot-Ordner den Befehl ./.venv/bin/pip install --upgrade yt-dlp ausführen und den Server danach neu starten.
 
 ## Sicherheit
 
