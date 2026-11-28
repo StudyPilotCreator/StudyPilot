@@ -111,7 +111,7 @@ def health(x_clippilot_token: Optional[str] = Header(None)):
             )
             subtitles_available = (
                 filters.returncode == 0
-                and re.search(r"\\bsubtitles\\b", filters.stdout) is not None
+                and re.search(r"\bsubtitles\b", filters.stdout) is not None
             )
         except Exception:
             subtitles_available = False
