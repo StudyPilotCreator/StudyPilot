@@ -14,7 +14,6 @@ fi
 
 brew install ffmpeg-full python@3.13 deno
 export PATH="/opt/homebrew/opt/ffmpeg-full/bin:/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
-export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
 
 PYTHON_BIN="$(command -v python3.13 || true)"
 if [ -z "$PYTHON_BIN" ]; then
