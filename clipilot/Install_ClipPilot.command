@@ -3,7 +3,7 @@ set -e
 cd "$(dirname "$0")"
 
 echo "ClipPilot Setup für Mac (Apple Silicon / Intel)"
-echo "Installiere FFmpeg, Python 3.13 und Deno (YouTube-JavaScript-Laufzeit)."
+echo "Installiere FFmpeg-full mit Untertitelfilter, Python 3.13 und Deno."
 
 if ! command -v brew >/dev/null 2>&1; then
   echo "Homebrew ist noch nicht installiert."
@@ -12,7 +12,8 @@ if ! command -v brew >/dev/null 2>&1; then
   exit 1
 fi
 
-brew install ffmpeg python@3.13 deno
+brew install ffmpeg-full python@3.13 deno
+export PATH="/opt/homebrew/opt/ffmpeg-full/bin:/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
 export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
 
 PYTHON_BIN="$(command -v python3.13 || true)"
@@ -38,6 +39,12 @@ echo ""
 echo "Installierte Versionen:"
 ./.venv/bin/python -m yt_dlp --version
 deno --version
+if ! ffmpeg -hide_banner -filters 2>/dev/null | grep -Eq '[[:space:]]subtitles[[:space:]]'; then
+  echo "FEHLER: Der FFmpeg-Untertitelfilter ist nicht verfügbar."
+  echo "Prüfe, ob ffmpeg-full installiert wurde."
+  exit 1
+fi
+echo "FFmpeg-Untertitelfilter: verfügbar"
 
 echo ""
 echo "Installation fertig."
