@@ -173,7 +173,7 @@ def srt_time(seconds: float) -> str:
 
 
 def score_window(segments, start: float, end: float) -> float:
-    """Heuristic score: speech coverage, useful phrases, reactions and variety."""
+    """Rank a window and give extra weight to an engaging first few seconds."""
     selected = [s for s in segments if s["start"] < end and s["end"] > start]
     if not selected:
         return -100.0
@@ -189,11 +189,11 @@ def score_window(segments, start: float, end: float) -> float:
     cues = {
         "reaction": [
             "wow", "wtf", "oh my god", "no way", "holy", "unglaublich",
-            "krass", "geisteskrank", "niemals", "ernsthaft",
+            "krass", "geisteskrank", "niemals", "ernsthaft", "unfassbar",
         ],
         "emotion": [
-            "ich liebe", "ich hasse", "verdammt", "geil", "unfassbar",
-            "crazy", "wild", "brutal", "absurd",
+            "ich liebe", "ich hasse", "verdammt", "geil", "crazy",
+            "wild", "brutal", "absurd", "unglaublich",
         ],
         "turning": [
             "aber dann", "plötzlich", "auf einmal", "doch dann",
@@ -210,6 +210,31 @@ def score_window(segments, start: float, end: float) -> float:
         matches = sum(text.count(phrase) for phrase in phrases)
         cue_score += min(4, matches) * weights[category]
 
+    # A short-form clip should open with a compelling line, not warm-up or silence.
+    hook_end = min(end, start + 5.0)
+    opening_segments = [
+        s for s in selected if s["start"] < hook_end and s["end"] > start
+    ]
+    opening_text = " ".join(s["text"] for s in opening_segments).lower()
+    opening_words = re.findall(r"\b[\w']+\b", opening_text)
+    hook_phrases = [
+        "wait", "look at this", "watch this", "no way", "oh my god",
+        "you won't believe", "you will not believe", "here's why",
+        "wusstest du", "du glaubst nicht", "schau dir", "warte bis",
+        "das ist", "warum", "wie kann", "unglaublich", "niemals",
+        "krass", "was passiert",
+    ]
+    hook_score = min(10.0, sum(opening_text.count(p) for p in hook_phrases) * 2.5)
+    if len(opening_words) >= 8:
+        hook_score += 3.0
+    elif len(opening_words) <= 2:
+        hook_score -= 3.0
+    if "?" in opening_text or "!" in opening_text:
+        hook_score += 2.0
+    if opening_segments:
+        opening_delay = max(0.0, opening_segments[0]["start"] - start)
+        hook_score -= min(5.0, opening_delay * 2.5)
+
     punctuation = sum(s["text"].count("!") + 0.6 * s["text"].count("?") for s in selected)
     sentence_starts = sum(1 for s in selected if s["text"].strip())
     density = min(12.0, word_count / max(1.0, end - start) * 20.0)
@@ -222,7 +247,7 @@ def score_window(segments, start: float, end: float) -> float:
 
     return (
         density + coverage + length_quality + cue_score + punctuation_score
-        + diversity - fragmentation_penalty - sparse_penalty
+        + diversity + hook_score - fragmentation_penalty - sparse_penalty
     )
 
 
@@ -239,52 +264,126 @@ def choose_windows(segments, duration: int, count: int, total: float):
     while cursor <= max_start:
         starts.add(round(cursor, 2))
         cursor += step
+
+    # Place candidates just before transcript sentence/phrase starts so the clip
+    # does not begin in the middle of a spoken word.
     for segment in segments:
-        for offset in (0.0, -3.0, -7.0, -12.0):
+        for offset in (-0.4, 0.0, -2.0, -5.0, -9.0):
             candidate = max(0.0, min(max_start, float(segment["start"]) + offset))
             starts.add(round(candidate, 2))
 
     candidates = [(score_window(segments, start, start + duration), start) for start in starts]
     candidates.sort(key=lambda item: item[0], reverse=True)
 
+    # Keep the strongest moments apart, but preserve their ranking in the output:
+    # clip_01 is the best-rated candidate and therefore the strongest opening clip.
     picked = []
     min_gap = duration * 0.35
     for score, start in candidates:
         if score <= -50:
             continue
         separated = all(
-            start + duration <= previous - min_gap
-            or start >= previous + duration + min_gap
-            for previous in picked
+            start + duration <= previous_start - min_gap
+            or start >= previous_start + duration + min_gap
+            for _previous_score, previous_start in picked
         )
         if separated:
-            picked.append(start)
+            picked.append((score, start))
             if len(picked) >= count:
                 break
 
     if not picked and candidates:
-        picked = [candidates[0][1]]
-    return [(start, min(total, start + duration)) for start in sorted(picked)]
+        picked = [candidates[0]]
+    return [
+        (start, min(total, start + duration))
+        for _score, start in picked
+    ]
 
 
 def write_srt(segments, start: float, end: float, path: Path) -> None:
+    """Write short, single-line captions from Whisper word-level timestamps."""
+    words = []
+    for segment in segments:
+        for word in segment.get("words", []):
+            token = str(word.get("word", "")).strip()
+            if token:
+                words.append({
+                    "start": float(word["start"]),
+                    "end": float(word["end"]),
+                    "text": token,
+                })
+
+    # Compatibility fallback if a model/runtime did not return word timestamps.
+    if not words:
+        for segment in segments:
+            raw_tokens = segment["text"].split()
+            if not raw_tokens:
+                continue
+            seg_start = float(segment["start"])
+            seg_end = float(segment["end"])
+            span = max(0.05, seg_end - seg_start)
+            for i, token in enumerate(raw_tokens):
+                words.append({
+                    "start": seg_start + span * i / len(raw_tokens),
+                    "end": seg_start + span * (i + 1) / len(raw_tokens),
+                    "text": token,
+                })
+
+    visible = []
+    for word in words:
+        a = max(start, word["start"])
+        b = min(end, word["end"])
+        if b <= a:
+            continue
+        visible.append({"start": a, "end": b, "text": word["text"]})
+
     lines = []
     index = 1
-    for segment in segments:
-        clip_start = max(start, segment["start"])
-        clip_end = min(end, segment["end"])
-        if clip_end <= clip_start:
-            continue
-        content = segment["text"].strip()
-        if not content:
-            continue
-        lines.extend([
-            str(index),
-            f"{srt_time(clip_start - start)} --> {srt_time(clip_end - start)}",
-            content,
-            "",
-        ])
-        index += 1
+    current = []
+    current_start = None
+    current_end = None
+    current_chars = 0
+    max_chars = 30
+    max_caption_seconds = 2.2
+
+    def flush_caption():
+        nonlocal index, current, current_start, current_end, current_chars
+        if not current or current_start is None or current_end is None:
+            return
+        caption = " ".join(item["text"] for item in current).strip()
+        if caption:
+            lines.extend([
+                str(index),
+                f"{srt_time(max(0.0, current_start - start))} --> {srt_time(max(0.05, current_end - start))}",
+                caption,
+                "",
+            ])
+            index += 1
+        current = []
+        current_start = None
+        current_end = None
+        current_chars = 0
+
+    for item in visible:
+        token = item["text"]
+        proposed_chars = current_chars + (1 if current else 0) + len(token)
+        proposed_duration = item["end"] - (current_start if current_start is not None else item["start"])
+        previous_ends_sentence = bool(current and re.search(r"[.!?][\"')\]]*$", current[-1]["text"]))
+
+        if current and (
+            proposed_chars > max_chars
+            or proposed_duration > max_caption_seconds
+            or previous_ends_sentence
+        ):
+            flush_caption()
+
+        if not current:
+            current_start = item["start"]
+        current.append(item)
+        current_end = item["end"]
+        current_chars += (1 if current_chars else 0) + len(token)
+
+    flush_caption()
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
@@ -314,11 +413,26 @@ def process_source(source: Path, count: int, duration: int, model_name: str):
             raise HTTPException(413, "Das Video ist länger als vier Stunden. Bitte einen kürzeren Link verwenden.")
 
         whisper = get_whisper(model_name)
-        transcribed, _info = whisper.transcribe(str(source), vad_filter=True)
-        segments = [
-            {"start": float(item.start), "end": float(item.end), "text": item.text.strip()}
-            for item in transcribed
-        ]
+        transcribed, _info = whisper.transcribe(
+            str(source), vad_filter=True, word_timestamps=True
+        )
+        segments = []
+        for item in transcribed:
+            item_words = []
+            for word in (getattr(item, "words", None) or []):
+                if word.start is None or word.end is None:
+                    continue
+                item_words.append({
+                    "start": float(word.start),
+                    "end": float(word.end),
+                    "word": word.word,
+                })
+            segments.append({
+                "start": float(item.start),
+                "end": float(item.end),
+                "text": item.text.strip(),
+                "words": item_words,
+            })
         windows = choose_windows(segments, duration, count, total)
         if not windows:
             raise HTTPException(
@@ -341,14 +455,18 @@ def process_source(source: Path, count: int, duration: int, model_name: str):
             if srt_path.stat().st_size:
                 video_filter += (
                     f",subtitles='{ffmpeg_sub_path(srt_path)}':"
-                    "force_style='FontSize=42,Outline=3,Shadow=1,Alignment=2,MarginV=180'"
+                    "force_style='FontName=Arial,FontSize=30,Bold=1,"
+                    "PrimaryColour=&H00FFFFFF,OutlineColour=&H00101010,"
+                    "BorderStyle=1,Outline=2,Shadow=1,Alignment=2,"
+                    "MarginL=90,MarginR=90,MarginV=300,WrapStyle=2'"
                 )
 
             command = [
                 FFMPEG_BIN or "ffmpeg", "-y", "-ss", str(start), "-i", str(source),
                 "-t", str(end - start), "-vf", video_filter,
-                "-c:v", "libx264", "-preset", "veryfast", "-crf", "24",
-                "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
+                "-c:v", "libx264", "-preset", "medium", "-crf", "20",
+                "-pix_fmt", "yuv420p",
+                "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart",
                 str(clip_path),
             ]
             encoded = subprocess.run(command, capture_output=True, text=True)
